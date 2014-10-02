@@ -97,6 +97,9 @@ public class VarTableModel extends AbstractTableModel {
 		}
 	}
 	
+	/* Input is VCF file and number of rows to load initially.  nRows is for when the VCF file is huge
+	 * and we don't need to load everything.
+	 */
 	public VarTableModel(File VCF, int nRows) {
 		VcfFileIterator vcfFile = new VcfFileIterator(VCF.getAbsolutePath());	
 		readHeader(vcfFile);
@@ -128,44 +131,47 @@ public class VarTableModel extends AbstractTableModel {
 		log.info("Reading data...");
 		long rows = 0;
 		data = new ArrayList<Object[]>();
-        for (VcfEntry ve : vcfFile) {
-        		Object rowData[] = new Object[columnNames.size()];
-        		
-        		rowData[0] = ve.getChromosomeNameOri();
-        		rowData[1] = ve.getStart()+1;
-        		rowData[2] = ve.getId();
-        		rowData[3] = ve.getRef();
-        		rowData[4] = ve.getAltsStr();
-        		rowData[5] = ve.getQuality();
-        		rowData[6] = ve.getFilterPass();
-        		
-        		int colIndex = 7;
-        		for (String key : keyList) {
-        			rowData[colIndex] = ve.getInfo(key);
+		
+		while (rows < nRows) {
+			VcfEntry ve = vcfFile.next();
+			
+			if (ve == null) 
+				break;
+			
+    		Object rowData[] = new Object[columnNames.size()];
+    		
+    		rowData[0] = ve.getChromosomeNameOri();
+    		rowData[1] = ve.getStart()+1;
+    		rowData[2] = ve.getId();
+    		rowData[3] = ve.getRef();
+    		rowData[4] = ve.getAltsStr();
+    		rowData[5] = ve.getQuality();
+    		rowData[6] = ve.getFilterPass();
+    		
+    		int colIndex = 7;
+    		for (String key : keyList) {
+    			rowData[colIndex] = ve.getInfo(key);
+    			colIndex++;
+    		}
+    		
+    		List<VcfGenotype> genotypes = ve.getVcfGenotypes();
+    		for (VcfGenotype genotype : genotypes) {
+    			for (String perSampleKey : perSampleKeyList) {
+    				if (perSampleKey.equals("GT")) 
+    					rowData[colIndex] = genotype.getGenotypeStr();
+    				else
+    					rowData[colIndex] = genotype.get(perSampleKey);	
+
         			colIndex++;
-        		}
-        		
-        		List<VcfGenotype> genotypes = ve.getVcfGenotypes();
-        		for (VcfGenotype genotype : genotypes) {
-        			for (String perSampleKey : perSampleKeyList) {
-        				if (perSampleKey.equals("GT")) 
-        					rowData[colIndex] = genotype.getGenotypeStr();
-        				else
-        					rowData[colIndex] = genotype.get(perSampleKey);	
+    			}
+    		}
+    		data.add(rowData);
 
-            			colIndex++;
-        			}
-        		}
-        		data.add(rowData);
-
-        		rows++;
-        		if ((rows % 10000) == 0) {
-        	        log.info("Finished reading " + rows + " rows");
-        		}
-        		
-        		if ((nRows != -1) && (rows >= nRows))
-        			break;
-        }
+    		rows++;
+    		if ((rows % 10000) == 0) {
+    	        log.info("Finished reading " + rows + " rows");
+    		}
+		}
         log.info("Read " + data.size() + " rows");
 	}
 
