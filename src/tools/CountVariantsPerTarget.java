@@ -1,6 +1,8 @@
 package tools;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -8,6 +10,7 @@ import org.biojava3.genome.parsers.gff.FeatureI;
 import org.biojava3.genome.parsers.gff.FeatureList;
 
 import ca.mcgill.mcb.pcingola.vcf.VcfEntry;
+import htsjdk.samtools.util.AsciiWriter;
 import htsjdk.samtools.util.IOUtil;
 import htsjdk.samtools.util.Log;
 import picard.cmdline.CommandLineProgram;
@@ -42,6 +45,7 @@ public class CountVariantsPerTarget extends CommandLineProgram {
 		VarTableModel varTableModel = null;
 		String[] sampleNames;
         FeatureList bedIntervals = null;
+        AsciiWriter out = null;
 
         log.info("Version: " + VERSION);
 		
@@ -49,19 +53,23 @@ public class CountVariantsPerTarget extends CommandLineProgram {
         IOUtil.assertFileIsReadable(BED);
         IOUtil.assertFileIsWritable(OUTPUT);
 
+        // Open the BED file
         try {
 			bedIntervals = BEDReader.read(BED.getAbsolutePath());
 		} catch (IOException e) {
 			e.printStackTrace();
 			return -1;
 		}
-        
-        // 1.  Determine how many samples are in the VCF file
-        // 2.  For each target in bed file:
-		// 3.  		For each sample
-        //				Count the number of variants that exist in this sample in this target
 
-        // Determine how many samples are in the VCF file
+        // Open the output text file
+        try {
+			out = new AsciiWriter(new FileOutputStream(OUTPUT));
+		} catch (FileNotFoundException e1) {
+			e1.printStackTrace();
+			return -1;
+		}
+
+        // Right now, handle 1 sample per VCF file
         varTableModel = new VarTableModel(VCF, -1);
         sampleNames = varTableModel.getSampleNames();
         if (sampleNames.length > 1) {
@@ -71,11 +79,24 @@ public class CountVariantsPerTarget extends CommandLineProgram {
 
         // For each target in bed file
         for (FeatureI target : bedIntervals) {
-			// Get a list of variants for this target for this sample
+			// Get a list of variants for this target
 			ArrayList<VcfEntry> variants = varTableModel.getVariantsInRange(target.seqname(), target.location().bioStart(), target.location().bioEnd());
-			System.out.println(target.toString() + "\t" + variants.size());
+			
+			try {
+				out.write(target.toString() + "\t" + variants.size() + "\n");
+			} catch (IOException e) {
+				continue;
+			}
         }
-		return 0;
+
+        // close the output file
+    	try {
+			out.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        return 0;
 	}
 
 }

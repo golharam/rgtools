@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!-- WARNING: Eclipse auto-generated file.
+              Any modifications will be overwritten.
+              To include a user specific buildfile here, simply create one in the same
+              directory with the processing instruction <?eclipse.ant.import?>
+              as the first entry and export the buildfile again. --><project basedir="." default="build" name="rgtools">
+    <property environment="env"/>
+    <property name="SnpEff.location" value="../SnpEff"/>
+    <property name="debuglevel" value="source,lines,vars"/>
+    <property name="target" value="1.7"/>
+    <property name="source" value="1.7"/>
+    <path id="org.eclipse.m2e.MAVEN2_CLASSPATH_CONTAINER.libraryclasspath"/>
+    <path id="SnpEff.classpath">
+        <pathelement location="${SnpEff.location}/target/classes"/>
+        <pathelement location="${SnpEff.location}/target/test-classes"/>
+        <path refid="org.eclipse.m2e.MAVEN2_CLASSPATH_CONTAINER.libraryclasspath"/>
+        <pathelement location="${SnpEff.location}/lib/commons-cli-1.2/commons-cli-1.2.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-actor_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/scala-library-2.11.2.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-agent_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-camel_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-cluster_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-contrib_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-dataflow_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-durable-mailboxes-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-file-mailbox_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-kernel_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-mailboxes-common_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-multi-node-testkit_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-persistence-experimental_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-persistence-tck-experimental_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-remote_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-remote-tests_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-slf4j_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-testkit_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/akka-transactor_2.11-2.3.6.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/camel-core-2.10.3.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/config-1.2.1.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/guava-12.0.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/hamcrest-core-1.3.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/hawtjni-runtime-1.8.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/jsr305-1.3.9.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/junit-4.11.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldb-0.5.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldb-api-0.5.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldbjni-1.7.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldbjni-all-1.7.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldbjni-linux32-1.5.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldbjni-linux64-1.5.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldbjni-osx-1.5.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldbjni-win32-1.5.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/leveldbjni-win64-1.5.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/netty-3.8.0.Final.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/protobuf-java-2.5.0.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/scala-continuations-library_2.11-1.0.2.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/scala-reflect-2.11.0.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/scala-stm_2.11-0.7.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/scalatest_2.11-2.1.3.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/slf4j-api-1.7.5.jar"/>
+        <pathelement location="${SnpEff.location}/lib/akka-2.3.6/lib/akka/uncommons-maths-1.2.2a.jar"/>
+    </path>
+    <path id="rgtools.classpath">
+        <pathelement location="bin"/>
+        <pathelement location="lib/biojava3-genome-3.1.0.jar"/>
+        <pathelement location="lib/picard-1.121.jar"/>
+        <pathelement location="lib/htsjdk-1.121.jar"/>
+        <path refid="SnpEff.classpath"/>
+    </path>
+    <target name="init">
+        <mkdir dir="bin"/>
+        <copy includeemptydirs="false" todir="bin">
+            <fileset dir="src">
+                <exclude name="**/*.launch"/>
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy>
+    </target>
+    <target name="clean">
+        <delete dir="bin"/>
+    </target>
+    <target depends="clean" name="cleanall">
+        <ant antfile="build.xml" dir="${SnpEff.location}" inheritAll="false" target="clean"/>
+    </target>
+    <target depends="build-subprojects,build-project" name="build"/>
+    <target name="build-subprojects">
+        <ant antfile="build.xml" dir="${SnpEff.location}" inheritAll="false" target="build-project">
+            <propertyset>
+                <propertyref name="build.compiler"/>
+            </propertyset>
+        </ant>
+    </target>
+    <target depends="init" name="build-project">
+        <echo message="${ant.project.name}: ${ant.file}"/>
+        <javac debug="true" debuglevel="${debuglevel}" destdir="bin" includeantruntime="false" source="${source}" target="${target}">
+            <src path="src"/>
+            <classpath refid="rgtools.classpath"/>
+        </javac>
+    </target>
+    <target description="Build all projects which reference this project. Useful to propagate changes." name="build-refprojects"/>
+    <target description="copy Eclipse compiler jars to ant lib directory" name="init-eclipse-compiler">
+        <copy todir="${ant.library.dir}">
+            <fileset dir="${ECLIPSE_HOME}/plugins" includes="org.eclipse.jdt.core_*.jar"/>
+        </copy>
+        <unzip dest="${ant.library.dir}">
+            <patternset includes="jdtCompilerAdapter.jar"/>
+            <fileset dir="${ECLIPSE_HOME}/plugins" includes="org.eclipse.jdt.core_*.jar"/>
+        </unzip>
+    </target>
+    <target description="compile project with Eclipse compiler" name="build-eclipse-compiler">
+        <property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter"/>
+        <antcall target="build"/>
+    </target>
+    <target name="CalculateTargetRegionCoverage">
+        <java classname="tools.CalculateTargetRegionCoverage" failonerror="true" fork="yes">
+            <arg line="B=/data/test/orig/BMS_1011_10ng_rep1_ACTATCGC_L001_R1_001_n6dupsRemoved_sorted_RG.bam BED=/data/test/targetPlus100_ET1273_1_92.bed O=/data/test/BMS_1011_rep1.txt"/>
+            <classpath refid="rgtools.classpath"/>
+        </java>
+    </target>
+    <target name="VCFBrowser">
+        <java classname="tools.VCFBrowser" failonerror="true" fork="yes">
+            <classpath refid="rgtools.classpath"/>
+        </java>
+    </target>
+    <target name="CountVariantsPerTarget">
+        <java classname="tools.CountVariantsPerTarget" failonerror="true" fork="yes">
+            <arg line="V=/data/rat_tox/BMS_1011_rep1.vcf B=/data/rat_tox/targetPlus100_ET1273_1_92.nochr.bed O=/data/rat_tox/BMS_1011_rep1.variants_summary.txt"/>
+            <classpath refid="rgtools.classpath"/>
+        </java>
+    </target>
+</project>
