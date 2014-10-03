@@ -9,7 +9,7 @@
                 <attribute name="Class-Path" value="."/>
                 <attribute name="Rsrc-Class-Path" value="./ biojava3-genome-3.1.0.jar picard-1.121.jar htsjdk-1.121.jar"/>
             </manifest>
-            <zipfileset src="jar-in-jar-loader.zip"/>
+            <zipfileset src="/home/golharr/workspace/rgtools/jar-in-jar-loader.zip"/>
             <fileset dir="/home/golharr/workspace/rgtools/bin"/>
             <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="biojava3-genome-3.1.0.jar"/>
             <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="picard-1.121.jar"/>

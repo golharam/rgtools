@@ -9,7 +9,7 @@
                 <attribute name="Class-Path" value="."/>
                 <attribute name="Rsrc-Class-Path" value="./ biojava3-genome-3.1.0.jar picard-1.121.jar htsjdk-1.121.jar commons-cli-1.2.jar akka-actor_2.11-2.3.6.jar scala-library-2.11.2.jar akka-agent_2.11-2.3.6.jar akka-camel_2.11-2.3.6.jar akka-cluster_2.11-2.3.6.jar akka-contrib_2.11-2.3.6.jar akka-dataflow_2.11-2.3.6.jar akka-durable-mailboxes-2.3.6.jar akka-file-mailbox_2.11-2.3.6.jar akka-kernel_2.11-2.3.6.jar akka-mailboxes-common_2.11-2.3.6.jar akka-multi-node-testkit_2.11-2.3.6.jar akka-persistence-experimental_2.11-2.3.6.jar akka-persistence-tck-experimental_2.11-2.3.6.jar akka-remote_2.11-2.3.6.jar akka-remote-tests_2.11-2.3.6.jar akka-slf4j_2.11-2.3.6.jar akka-testkit_2.11-2.3.6.jar akka-transactor_2.11-2.3.6.jar camel-core-2.10.3.jar config-1.2.1.jar guava-12.0.jar hamcrest-core-1.3.jar hawtjni-runtime-1.8.jar jsr305-1.3.9.jar junit-4.11.jar leveldb-0.5.jar leveldb-api-0.5.jar leveldbjni-1.7.jar leveldbjni-all-1.7.jar leveldbjni-linux32-1.5.jar leveldbjni-linux64-1.5.jar leveldbjni-osx-1.5.jar leveldbjni-win32-1.5.jar leveldbjni-win64-1.5.jar netty-3.8.0.Final.jar protobuf-java-2.5.0.jar scala-continuations-library_2.11-1.0.2.jar scala-reflect-2.11.0.jar scala-stm_2.11-0.7.jar scalatest_2.11-2.1.3.jar slf4j-api-1.7.5.jar uncommons-maths-1.2.2a.jar"/>
             </manifest>
-            <zipfileset src="jar-in-jar-loader.zip"/>
+            <zipfileset src="/home/golharr/workspace/rgtools/jar-in-jar-loader.zip"/>
             <fileset dir="/home/golharr/workspace/rgtools/bin"/>
             <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="biojava3-genome-3.1.0.jar"/>
             <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="picard-1.121.jar"/>
