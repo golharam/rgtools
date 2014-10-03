@@ -13,6 +13,7 @@ import org.omg.DynamicAny.NameValuePair;
 
 import htsjdk.samtools.util.Log;
 import ca.mcgill.mcb.pcingola.fileIterator.VcfFileIterator;
+import ca.mcgill.mcb.pcingola.interval.Interval;
 import ca.mcgill.mcb.pcingola.vcf.VcfEntry;
 import ca.mcgill.mcb.pcingola.vcf.VcfGenotype;
 import ca.mcgill.mcb.pcingola.vcf.VcfHeader;
@@ -38,7 +39,9 @@ public class VarTableModel extends AbstractTableModel {
 	
 	private ArrayList<String> columnNames = new ArrayList<String>();
 	private ArrayList<String> columnDescs = new ArrayList<String>();
+	private HashMap<String, Integer> keyToDataColumnIndex = new HashMap<String, Integer>();
     protected ArrayList<Object[]> data;
+    protected ArrayList<VcfEntry> variants;
 
 	private HashMap<String, VcfInfo> vcfInfoById = new HashMap<String, VcfInfo>();
 	private HashMap<String, VcfInfo> vcfFormatById = new HashMap<String, VcfInfo>();
@@ -97,8 +100,9 @@ public class VarTableModel extends AbstractTableModel {
 		}
 	}
 	
-	/* Input is VCF file and number of rows to load initially.  nRows is for when the VCF file is huge
-	 * and we don't need to load everything.
+	/* Input is VCF file and number of rows to load initially.  
+	 * nRows is for when the VCF file is huge and we don't need to load everything, you can specify
+	 * how many rows to load.  -1 indicates to load all rows.
 	 */
 	public VarTableModel(File VCF, int nRows) {
 		VcfFileIterator vcfFile = new VcfFileIterator(VCF.getAbsolutePath());	
@@ -108,31 +112,39 @@ public class VarTableModel extends AbstractTableModel {
 		int i = 0;
 		for (String colName : defaultColumnNames) {
 			columnNames.add(colName);
-			columnDescs.add(defaultColumnDescs[i++]);
+			columnDescs.add(defaultColumnDescs[i]);
+			keyToDataColumnIndex.put(colName, i);
+			i++;
 		}		
 		for (String key : keyList) {
 			columnNames.add(key);
 			VcfInfo info = vcfInfoById.get(key);
 			columnDescs.add(info.getDescription());
+			keyToDataColumnIndex.put(key, i);
+			i++;
 		}
 		for (String sample : sampleNames) {
 			for (String perSampleKey : perSampleKeyList) {
     			columnNames.add(sample + "-" + perSampleKey);
     			VcfInfo info = vcfFormatById.get(perSampleKey);
     			columnDescs.add(info.getDescription());
+    			keyToDataColumnIndex.put(sample + "-" + perSampleKey, i);
+    			i++;
 			}
 		}
 		log.info("Found " + columnNames.size() + " columns: ");
 		for (String colName : columnNames) {
-			log.info("Column: " + colName);
+			log.info("Column: " + colName + " (" + keyToDataColumnIndex.get(colName) + ")");
 		}
 
 		// read in data in the same order as columns
 		log.info("Reading data...");
-		long rows = 0;
+		long rows = 0; 
+		long rowLimit = (nRows == -1) ? rows+1 : nRows;
 		data = new ArrayList<Object[]>();
+		variants = new ArrayList<VcfEntry>();
 		
-		while (rows < nRows) {
+		while (rows < rowLimit) {
 			VcfEntry ve = vcfFile.next();
 			
 			if (ve == null) 
@@ -166,11 +178,14 @@ public class VarTableModel extends AbstractTableModel {
     			}
     		}
     		data.add(rowData);
-
+    		variants.add(ve);
+    		
     		rows++;
     		if ((rows % 10000) == 0) {
     	        log.info("Finished reading " + rows + " rows");
     		}
+    		if (nRows == -1)
+    			rowLimit = rows+1;
 		}
         log.info("Read " + data.size() + " rows");
 	}
@@ -208,5 +223,18 @@ public class VarTableModel extends AbstractTableModel {
 
 	public String getBAMFileURI(String sample) {
 		return bamFiles.get(sample);
+	}
+	
+	// Return a list of variants from data[] that are in a specific range (inclusive of the ends)
+	public ArrayList<VcfEntry> getVariantsInRange(String chr, int start, int end) {
+		ArrayList<VcfEntry> variantsInRange = new ArrayList<VcfEntry>();
+		Interval targetInterval = new Interval(null, start, end, false, null);
+		
+		for (VcfEntry v : variants) {
+			if (v.getChromosomeNameOri().equals(chr) && v.intersects(targetInterval)) {
+				variantsInRange.add(v);
+			}
+		}
+		return variantsInRange;
 	}
 }
