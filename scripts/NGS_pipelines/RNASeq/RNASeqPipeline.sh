@@ -52,6 +52,8 @@ echo "Using parameters file $PARAMETERS_FILE"
 date '+%m/%d/%y %H:%M:%S' 
 echo
 . ${PARAMETERS_FILE}
+echo "THREADS=$THREADS"
+echo
  
 ##############################################################
 ##  Make analysis directory                                 ##
@@ -354,6 +356,34 @@ then
         date2=$(date +"%s")
         diff=$(($date2-$date1))
         echo "Runng GATK::SplitNCigarReads took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
+        echo
+fi
+
+##############################################################
+## Count Reads                                              ##
+##############################################################
+
+if [ ! -e $SAMPLE_NAME.rawcounts.txt ]
+then
+        echo Count Reads
+        date '+%m/%d/%y %H:%M:%S'
+        date1=$(date +"%s")
+
+	# See http://www-huber.embl.de/users/anders/HTSeq/doc/count.html for parameters
+	$HTSEQ_COUNT -f bam -r pos --stranded=$HTSEQ_STRANDED ${SAMPLE_NAME}.dedup.karyotype.trimmed.bam $REF_GFF > $SAMPLE_NAME.raw_counts.txt
+
+        if [ $? -ne 0 ]
+        then
+                echo "Encountered error counting reads"
+                rm ${SAMPLE_NAME}.raw_counts.txt 2>/dev/null
+                exit -1
+        fi
+
+        echo Finished counting reads
+        date '+%m/%d/%y %H:%M:%S'
+        date2=$(date +"%s")
+        diff=$(($date2-$date1))
+        echo "Running htseq-count took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
         echo
 fi
 
