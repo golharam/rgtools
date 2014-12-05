@@ -200,6 +200,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
+	ls *.dedup.realigned.bam > bamfiles.realigned.list
 	${JAVA} -jar ${GATK_JAR} \
 		-T BaseRecalibrator \
 		-I bamfiles.realigned.list \
