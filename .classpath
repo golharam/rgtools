@@ -5,6 +5,6 @@
 	<classpathentry kind="lib" path="lib/biojava3-genome-3.1.0.jar"/>
 	<classpathentry kind="lib" path="lib/picard-1.121.jar"/>
 	<classpathentry kind="lib" path="lib/htsjdk-1.121.jar"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/SnpEff"/>
+	<classpathentry kind="lib" path="lib/snpEff.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

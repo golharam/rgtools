@@ -9,15 +9,14 @@ import java.util.regex.Pattern;
 
 import javax.swing.table.AbstractTableModel;
 
-import org.omg.DynamicAny.NameValuePair;
-
-import htsjdk.samtools.util.Log;
 import ca.mcgill.mcb.pcingola.fileIterator.VcfFileIterator;
 import ca.mcgill.mcb.pcingola.interval.Interval;
 import ca.mcgill.mcb.pcingola.vcf.VcfEntry;
 import ca.mcgill.mcb.pcingola.vcf.VcfGenotype;
 import ca.mcgill.mcb.pcingola.vcf.VcfHeader;
 import ca.mcgill.mcb.pcingola.vcf.VcfInfo;
+import htsjdk.samtools.util.Log;
+
 
 public class VarTableModel extends AbstractTableModel {
     private final Log log = Log.getInstance(VarTableModel.class);

@@ -118,7 +118,8 @@ public class CalculateTargetRegionCoverage extends CommandLineProgram {
 	        SAMRecordIterator records = samReader.iterator();
 	        while (records.hasNext()) {
 	            final SAMRecord rec = records.next();
-	            totalReads++;
+	            // TBD: This value does not match whats in the fastq file.  Why?
+	            totalReads++;	
 	            
 	            if (filterRead(rec)) continue;
 	

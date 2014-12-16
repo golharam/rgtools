@@ -76,29 +76,32 @@ for my $s (@ORDERED_SAMPLES) {
 }
 
 # 3.  Output header rows
-print "\t\t\t\t\t";
+open(OUT, ">pertargetmetrics.txt") || die "Unable to open pertargetmetrics.txt";
+print OUT "\t\t\t\t\t";
 for my $s (@ORDERED_SAMPLES) {
-	print "\t";
-	print join("\t", "|----------", "-------------", $s, '--------', '----------|');
+	print OUT "\t";
+	print OUT join("\t", "|----------", "-------------", $s, '--------', '----------|');
 }
-print "\n";
-print join("\t", "Target", "Chromosome", "Start", "End", "Strand", "Length");
+print OUT "\n";
+print OUT join("\t", "Target", "Chromosome", "Start", "End", "Strand", "Length");
 for my $s (@ORDERED_SAMPLES) {
-	print "\t";
-	print join("\t", "Total Reads", "Mean Coverage", "AvgPerBaseCoverage", 'Bases@10X', 'PctBases@10X');
+	print OUT "\t";
+	print OUT join("\t", "Total Reads", "Mean Coverage", "AvgPerBaseCoverage", 'Bases@10X', 'PctBases@10X');
 }
-print "\n";
+print OUT "\n";
 
 # 4.  Print out target and sample info
 for my $target (@ORDERED_TARGETS) {
-	print join("\t", $target, $TARGETS{$target}{'Chromosome'}, $TARGETS{$target}{'Start'}, $TARGETS{$target}{'End'}, 
+	print OUT join("\t", $target, $TARGETS{$target}{'Chromosome'}, $TARGETS{$target}{'Start'}, $TARGETS{$target}{'End'}, 
 			 $TARGETS{$target}{'Strand'}, $TARGETS{$target}{'Length'});
 
 	for my $s (@ORDERED_SAMPLES) {
-		print "\t";
-		print join("\t", $SAMPLES{$s}{$target}{'Total Reads'}, $SAMPLES{$s}{$target}{'Mean Coverage'}, 
+		print OUT "\t";
+		print OUT join("\t", $SAMPLES{$s}{$target}{'Total Reads'}, $SAMPLES{$s}{$target}{'Mean Coverage'}, 
 			$SAMPLES{$s}{$target}{'AvgPerBaseCoverage'}, $SAMPLES{$s}{$target}{'Base10X'},
 			$SAMPLES{$s}{$target}{'PctBases10X'});
 	}
-	print "\n";
+	print OUT "\n";
 }
+close(OUT);
+

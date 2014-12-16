@@ -45,6 +45,11 @@ public class GenomicFeature implements GenomicFeatureI {
 	}
 
 	@Override
+	public int getLength() {
+		return end - start + 1;
+	}
+	
+	@Override
 	public char getStrand() {
 		return strand;
 	}

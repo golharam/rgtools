@@ -7,6 +7,7 @@ public interface GenomicFeatureI {
 	public int getEnd();
 	public void setEnd(int end);
 	public char getStrand();
+	public int getLength();
 	public Object getAttribute(String attributeName);
 	public String getAttributes();
 	public String toString();
