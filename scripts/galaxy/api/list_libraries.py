@@ -42,8 +42,8 @@ def main():
         # Galaxy returns a list of files, folders, and files/folders within folders.  There is no tree of elements, just a list.
         library_contents = display(api_key, api_url + "/api/libraries/%s/contents" % library['id'], return_formatted = False) 
         for entry in library_contents:
-            if entry['name'] == '/':
-                continue
+            #if entry['name'] == '/':
+            #    continue
             if entry['type'] == 'folder':
                 print '   %s' % entry['name']
                 if _debug:
