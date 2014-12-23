@@ -16,6 +16,7 @@ from string import split
 from common import display, submit
 import os
 import sys
+import time
 
 _api_url = ''
 _api_key = ''
@@ -88,7 +89,7 @@ def main():
         print 'File already exists in Galaxy library'
         sys.exit(1)
     
-    print 'Adding %s to %s' % (_file, library['name'])
+    print 'Adding %s to %s' % (_file, _libraryPath)
     data = {}
     data['folder_id'] = folder['id']
     data['create_type'] = 'file'    
@@ -98,10 +99,16 @@ def main():
     data['filesystem_paths'] = _file
     data['link_data_only'] = 'link_to_files'
     
-    libset = submit(_api_key, _api_url + "/api/libraries/%s/contents" % library['id'], data, return_formatted = True)
-    print libset
+    libset = submit(_api_key, _api_url + "/api/libraries/%s/contents" % library['id'], data, return_formatted = False)
+    for lib in libset:
+        file_metadata = display(_api_key, _api_url + '/api/libraries/datasets/%s' % lib['id'], return_formatted = False)
+        while file_metadata['state'] == 'running' or file_metadata['state'] == 'queued':
+            print 'State is %s.  Sleep for 5 seconds.' % file_metadata['state'] 
+            time.sleep(5)
+            file_metadata = display(_api_key, _api_url + '/api/libraries/datasets/%s' % lib['id'], return_formatted = False)
 
-    
+        print 'State is %s' % file_metadata['state']
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("api_key", help="API KEY")
