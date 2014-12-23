@@ -45,14 +45,20 @@ def main():
             if entry['name'] == '/':
                 continue
             if entry['type'] == 'folder':
-                print ' %s' % entry['name']
+                print '   %s' % entry['name']
                 if _debug:
-                    print ' (%s)' % entry
+                    print '   (%s)' % entry
             if entry['type'] == 'file':
                 fields = split(entry['name'], '/')
-                print '    %s' % fields[len(fields) - 1]
+                # First entry is always a /, so remove this by shifting off the first element
+                fields = fields[1:]
+                spaces = ''
+                for i in range(len(fields)):
+                    spaces += '   '
+                    
+                print '%s%s' % (spaces, fields[len(fields) - 1])
                 if _debug:
-                    print '    (%s)' % entry
+                    print '%s(%s)' % (spaces, entry)
         print ''
         i+=1
         #for folder in folders:
@@ -65,7 +71,7 @@ if __name__ == '__main__':
     parser.add_argument('api_url', help='API URL')
     parser.add_argument('debug', help="Print Debug Statement (boolean)")
     args = parser.parse_args()
-    _debug = args.debug
+    _debug = int(args.debug)
     api_key = args.api_key
     api_url = args.api_url
     main()
