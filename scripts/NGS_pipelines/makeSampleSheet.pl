@@ -1,3 +1,8 @@
+#!/usr/bin/env perl
+use strict;
+
+my %SAMPLES;
+
 my $cwd = `pwd`;
 chomp $cwd;
 
@@ -5,15 +10,28 @@ print "# Created by Ryan Golhar\n";
 print "# file is used by my scripts to keep track of samples and file locations for pipeline\n";
 print "# Basedir: $cwd";
 print "#Sample\tFastQ1\tFastQ2\n";
-for my $dir (`ls -d FASTQ/Sample_*`) {
-	chomp $dir;
-	my $sample = `basename $dir`;
-	chomp $sample;
 
-	my $f1 = `ls $dir/*R1*.fastq.gz`;
-	chomp $f1;
-	my $f2 = `ls $dir/*R2*.fastq.gz`;
-	chomp $f2;
+for my $gzfile (`ls sourceData/*`) {
+	chomp $gzfile;
+	$gzfile =~ /M2GEN-BMS-(.*)\.clipped\.fastq\.gz/;
+	my $sample = $1;
+	if ($sample =~ /^(.*)_1$/) {
+		my $sample_name = $1;
+		if (defined($SAMPLES{$sample_name}{'fq1'})) {
+			print STDERR "$sample_name fq1 already exists\n";
+		} else {
+			$SAMPLES{$sample_name}{'fq1'} = "$cwd/$gzfile";
+		}
+	} elsif ($sample =~ /^(.*)_2$/) {
+                my $sample_name = $1;
+		if (defined($SAMPLES{$sample_name}{'fq2'})) {
+			print STDERR "$sample_name fq2 already exists\n";
+		} else {
+			$SAMPLES{$sample_name}{'fq2'} = "$cwd/$gzfile";
+		}
+	}
+}
 
-	print "$sample\t$cwd/$f1\t$cwd/$f2\n";
+for my $sample (keys %SAMPLES) {
+	print join("\t", $sample, $SAMPLES{$sample}{'fq1'}, $SAMPLES{$sample}{'fq2'}), "\n";
 }
