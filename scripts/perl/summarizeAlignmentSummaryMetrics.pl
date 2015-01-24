@@ -7,8 +7,8 @@ my $printHeader = 0;
 my @colNames;
 my $sampleColIndex;
 while (<FILE>) {
-	next if length($_) == 0;
 	chomp;
+	next if length($_) == 0;
 
 	# Collect the alignment metrics for all the samples
 	if (m/^## METRICS CLASS/) {
@@ -22,15 +22,16 @@ while (<FILE>) {
 		$sampleColIndex = 0;
 		while ($colNames[$sampleColIndex] !~ m/SAMPLE/) { $sampleColIndex++ }
 
-		my $line = <FILE>;		
+		my $line = <FILE>;
+		chomp $line;
 		while (length($line) != 0) {
-			chomp $line;
 			my @fields = split(/\t/, $line);
 			if (length($fields[$sampleColIndex]) > 0) {
 				my $sample = $fields[$sampleColIndex];
 				print "$line\n";		
 			}
 			$line = <FILE>;
+			chomp $line;
 		}
 	}
 }
