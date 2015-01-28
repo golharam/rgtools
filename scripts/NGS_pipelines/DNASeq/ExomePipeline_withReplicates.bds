@@ -1,0 +1,299 @@
+#!/usr/bin/env bds
+
+string fastqValidatorApp = "/ngs/ngs15/golharr/apps/fastQValidator/bin/fastQValidator"
+string fastqcApp = "/ngs/ngs15/golharr/apps/FastQC-0.11.2/fastqc"
+string bwaApp = "/apps/sys/galaxy/external_packages/bin/bwa"
+string bwaReference = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/bwa_index/hg19"
+string javaApp = "/ngs/ngs15/golharr/apps/jre1.7.0_67/bin/java"
+string picardDir = "/ngs/ngs15/golharr/apps/picard-tools-1.119"
+string reference = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/hg19.fa"
+string gatkJar = "/ngs/ngs15/golharr/apps/GenomeAnalysisTK-2014.3-17-g0583018/GenomeAnalysisTK.jar"
+string gatkKnownSnps = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/1000G_phase1.snps.high_confidence.hg19.vcf"
+string gatkHapMap = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/hapmap_3.3.hg19.vcf"
+string gatkOmni = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/1000G_omni2.5.hg19.vcf"
+string gatkDbSnp = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/dbsnp_137.hg19.vcf"
+
+print "Exome Pipeline v0.1\n"
+
+# 1.  Get the cohort of samples to process.  The name of the file is either 
+#     passed on the command line as the first argument, or is assumed to be
+#     in the current directory and named samples.txt
+
+string cohort = "samples.txt"
+if (!cohort.canRead()) {
+	print "ERROR: Unable to locate $cohort\n"
+	print "Usage: ExomePipeline.bds [-cohort <samples.txt>]\n"
+	return -1	
+}
+print "\tcohort: $cohort\n\n"
+
+# 2.  Read in the list of samples including sample name, fastq1, fastq2 and
+#     build a sample list
+
+string[] samples
+string{} replicate_to_sample
+string{} fq1
+string{} fq2
+
+string[] lines = cohort.readLines()
+string{} tmp
+for ( string line : lines ) {
+	string sample
+	string replicate
+	string fastq1
+	string fastq2
+	(sample, replicate, fastq1, fastq2) = line.split('\t')
+
+        tmp{sample} = "1"
+        replicate_to_sample{replicate} = sample
+        fq1{replicate} = fastq1
+        fq2{replicate} = fastq2
+}
+samples = tmp.keys()
+
+# Print out the sample information to see that it was loaded correctly
+print "Samples:\n"
+for (string sample : samples) {
+        print "\t$sample\n"
+
+        for (string replicate : replicate_to_sample.keys()) {
+                if (replicate_to_sample{replicate} == sample) {
+                        #print "\t\t$replicate ("+fq1{replicate}+","+fq2{replicate}+")\n"
+                        print "\t\t$replicate\n"
+                }
+        }
+}
+print "\n"
+
+# For each replicate:
+string{} jobsValidateFQ1
+string{} jobsValidateFQ2
+for (string replicate : replicate_to_sample.keys()) {
+	string fastq1 = fq1{replicate}
+        string fastq2 = fq2{replicate}
+        
+	# 1.  Validate the FASTQ Files        
+        string outFile = "analysis/$replicate.fq1.fastqValidator.txt"
+	jobsValidateFQ1{replicate} = task (outFile <- fastq1) {
+		sys $fastqValidatorApp --disableSeqIDCheck --file $fastq1 > $outFile
+	}
+
+        outFile = "analysis/$replicate.fq2.fastqValidator.txt"
+	jobsValidateFQ2{replicate} = task (outFile <- fastq2) {
+		sys $fastqValidatorApp --disableSeqIDCheck --file $fastq1 > $outFile
+	}
+	
+	# 2.  Run FASTQC
+	string[] outputFiles = ["analysis/" + fastq1.baseName(".fastq.gz") + "_fastqc.html", "analysis/" + fastq1.baseName(".fastq.gz") + "_fastqc.zip", \
+				"analysis/" + fastq2.baseName(".fastq.gz") + "_fastqc.html", "analysis/" + fastq2.baseName(".fastq.gz") + "_fastqc.zip"]
+	task (outputFiles <- [fastq1, fastq2], cpus := 2) {
+		sys $fastqcApp -t 2 --outdir=analysis/ $fastq1 $fastq2
+	}
+	
+}
+
+# For each replicate:
+string[] dedupReplicateBamFiles
+for (string replicate : replicate_to_sample.keys()) {
+	string jobValidateFQ1 = jobsValidateFQ1{replicate}
+	string jobValidateFQ2 = jobsValidateFQ2{replicate}
+
+	wait jobValidateFQ1, jobValidateFQ2
+	if (!jobValidateFQ1.isDoneOk() || !jobValidateFQ2.isDoneOk()) {
+		print("Error validating FASTQ files for $replicate\n")
+	} else {
+		string fastq1 = fq1{replicate}
+		string fastq2 = fq2{replicate}
+
+		# 1.  Map the replicate
+		string samFile = "analysis/$replicate.sam"
+		task (samFile <- [fastq1, fastq2], cpus := 4) {
+			sys $bwaApp mem -t 4 -M -R '@RG\tID:$replicate\tSM:$replicate\tLB:$replicate\tPL:illumina' $bwaReference $fastq1 $fastq2 > $samFile
+		}
+
+		# 2.  Sort the BAM file		
+		string bamFile = "analysis/$replicate.bam"
+		task (bamFile <- samFile) {
+			sys $javaApp -Xmx4G -Djava.io.tmpdir=/scratch2 -jar $picardDir/SortSam.jar SO=coordinate INPUT=$samFile OUTPUT=$bamFile VALIDATION_STRINGENCY=LENIENT CREATE_INDEX=true
+		}
+
+		# 3.  Collect alignment metrics		
+		string alnSummaryMetricsFile = "analysis/$replicate.alignment_summary_metrics.txt"
+		task (alnSummaryMetricsFile <- bamFile) {
+			sys $javaApp -Xmx4G -Djava.io.tmpdir=/scratch2 -jar $picardDir/CollectAlignmentSummaryMetrics.jar I=$bamFile O=$alnSummaryMetricsFile LEVEL=SAMPLE R=$reference
+		}
+
+		# 4.  Mark Duplicates		
+		string dedupBamFile = "analysis/$replicate.dedup.bam"
+		string dedupMetricsFile = "analysis/$replicate.dedup.metrics"
+		task ([dedupBamFile, dedupMetricsFile] <- bamFile) {
+			sys $javaApp -Xmx4G -Djava.io.tmpdir=/scratch2 -jar $picardDir/MarkDuplicates.jar I=$bamFile O=$dedupBamFile M=$dedupMetricsFile VALIDATION_STRINGENCY=LENIENT CREATE_INDEX=true
+		}
+		dedupReplicateBamFiles.add(dedupBamFile)
+	}
+}
+
+# Everything is in one lane so there is no more per-lane processing to be done.  At this point we 
+# merge the replicates and continue processing. So, 
+# Merge the replicates into samples, collect alignment summary metrics, dedup samples and collect dedup metrics on the samples
+string[] sampleBamFiles
+string{} sampleRealignedBamFiles
+string{} sampleRecalibratedBamFiles
+for (string sample : samples) {
+	# 1.  Construct a list of replicate bam files for each sample to be merge
+	string[] perSampleReplicateBamFiles
+	string inputReplicates
+        for (string replicate : replicate_to_sample.keys()) {
+                if (replicate_to_sample{replicate} == sample) {
+                	perSampleReplicateBamFiles.add("analysis/$replicate.dedup.bam");
+                	inputReplicates += " I=analysis/$replicate.dedup.bam"
+                }
+        }
+
+	# 2.  Merge the replicate deduped BAM files into a Sample BAM file
+	string sampleBamFile = "analysis/$sample.merged.bam"
+	task ( sampleBamFile <- perSampleReplicateBamFiles ) {
+		sys $javaApp -Xmx4G -Djava.io.tmpdir=/scratch2 -jar $picardDir/MergeSamFiles.jar $inputReplicates O=$sampleBamFile MSD=true
+	}
+
+	# 3.  Update the Read Group data
+	string sampleRGBamFile = "analysis/$sample.merged.rg.bam"
+	task ( sampleRGBamFile <- sampleBamFile ) {
+		sys $javaApp -Xmx4G -Djava.io.tmpdir=/scratch2 -jar $picardDir/AddOrReplaceReadGroups.jar I=$sampleBamFile O=$sampleRGBamFile SO=coordinate RGID=$sample RGLB=$sample RGPL=illumina RGSM=$sample RGPU=M00950 CREATE_INDEX=true
+	}
+
+	# 4.  Collect per target coverage metrics
+	string targetRegionCoverageFile = "analysis/$sample.targetRegionCoverage.txt"
+	task (targetRegionCoverageFile <- sampleRGBamFile) {
+		sys $javaApp -Xmx4G -Djava.io.tmpdir=/scratch2 -jar /home/golharr/workspace/rgtools/dist/CalculateTargetRegionCoverage.jar B=$sampleRGBamFile G=CNGHS-00721Z-199_covered.bed O=$targetRegionCoverageFile
+	}
+	
+	sampleBamFiles.add(sampleRGBamFile)
+	sampleRealignedBamFiles{sample} = "analysis/$sample.merged.rg.realigned.bam"
+	sampleRecalibratedBamFiles{sample} = "analysis/$sample.merged.rg.realigned.recal.bam"
+}
+
+# 5.  Realign around indels( 8 samples, 8 threads)
+string indelRealignerTargetsFile = "analysis/indelrealigner.list"
+task ( indelRealignerTargetsFile <- sampleBamFiles, cpus := 8) {
+	sys find analysis/ -name '*.merged.rg.bam' > analysis/bamfiles.list; \
+            $javaApp -jar $gatkJar \
+                -T RealignerTargetCreator \
+                -nt 8 \
+                -R $reference \
+                -I analysis/bamfiles.list \
+                -o $indelRealignerTargetsFile
+}
+
+# BDS is stripping my single quotes.
+print "Realigning around indels...\n"
+task ( sampleRealignedBamFiles.values() <- indelRealignerTargetsFile ) {
+	#sys cat analysis/bamfiles.list | sed 's/analysis\///' > analysis/bamfiles.txt; \
+	#    cat analysis/bamfiles.txt | sed 's/.bam/.realigned.bam/' | awk '{print "analysis/"$1}' > analysis/bamfiles.realigned.list; \
+	#    paste analysis/bamfiles.txt analysis/bamfiles.realigned.list > analysis/bamfiles.realigned.map; \
+	sys  $javaApp -Xmx4G -jar $gatkJar \
+		-T IndelRealigner \
+		-R $reference \
+		-I analysis/bamfiles.list \
+		-targetIntervals analysis/indelrealigner.list \
+		-nWayOut analysis/bamfiles.realigned.map
+}
+
+# 6.  Recalibrate quality scores
+print "Calibrating Base Quality Scores...\n"
+task ( "analysis/recal.table" <- sampleRealignedBamFiles.values()) {
+	sys $javaApp -jar $gatkJar \
+		-T BaseRecalibrator \
+		-I analysis/bamfiles.realigned.list \
+		-R $reference \
+		-o analysis/recal.table \
+		-knownSites $gatkKnownSnps
+}
+
+print "Recalibrating Base Quality Scores...\n"
+task ( "analysis/post_recal.table" <- "analysis/recal.table" ) {
+	sys $javaApp -jar $gatkJar \
+		-T BaseRecalibrator \
+		-I analysis/bamfiles.realigned.list \
+		 -knownSites $gatkKnownSnps \
+		-R $reference \
+		-BQSR analysis/recal.table \
+		-o analysis/post_recal.table
+}
+
+print "Plotting Base Quality Scores...\n"
+task ( "analysis/recalibration_plots.pdf" <- ["analysis/recal.table", "analysis/post_recal.table"] ) {
+	sys $javaApp -jar $gatkJar \
+		-T AnalyzeCovariates \
+		-R $reference \
+		-before analysis/recal.table \
+		-after analysis/post_recal.table \
+		-plots analysis/recalibration_plots.pdf
+}
+
+print "Creating Recalibrated Bam Files...\n"
+for (string sample : samples) {
+	string realignedBamFile = sampleRealignedBamFiles{sample}
+	string recalBamFile = sampleRecalibratedBamFiles{sample}
+	
+	task ( recalBamFile <- [ "analysis/recal.table", realignedBamFile ] ) {
+		sys $javaApp -jar $gatkJar \
+			-T PrintReads \
+			-R $reference \
+			-I $realignedBamFile \
+			-BQSR analysis/recal.table \
+			-o $recalBamFile
+	}
+}
+
+print "Running Haplotype Caller...\n"
+task ( "analysis/cohort.raw.hc.vcf" <- sampleRecalibratedBamFiles.values() ) {
+	sys ls analysis/*.recal.bam > analysis/bamfiles.recal.list; \
+	    $javaApp -jar $gatkJar \
+		-T HaplotypeCaller  \
+		-R $reference \
+		-I analysis/bamfiles.recal.list \
+		--dbsnp $gatkKnownSnps \
+		-o analysis/cohort.raw.hc.vcf
+}
+
+print "Evaluating raw variant calls...\n"
+task ( "analysis/cohort.raw.hc.eval.txt" <- "analysis/cohort.raw.hc.vcf" ) {
+        sys $javaApp -jar $gatkJar \
+                -T VariantEval \
+                --eval analysis/cohort.raw.hc.vcf \
+                -R $reference \
+                --dbsnp $gatkKnownSnps \
+                -o analysis/cohort.raw.hc.eval.txt
+}
+
+/*
+print "Recalibrating variant calls...\n"
+task ( [ "analysis/output.recal", "analysis/output.tranches", "analysis/output.plots.R" ] <- "analysis/cohort.raw.hc.vcf") {
+        sys $javaApp -jar $gatkJar \
+		-T VariantRecalibrator \
+		-R $reference \
+		--input analysis/cohort.raw.hc.vcf \
+		--resource:hapmap,known=false,training=true,truth=true,prior=15.0 $gatkHapMap \
+		--resource:omni,known=false,training=true,truth=false,prior=12.0 $gatkOmni \
+		--resource:1000G,known=false,training=true,truth=false,prior=10.0 $gatkKnownSnps \
+		--resource:dbsnp,known=true,training=false,trush=false,prior=6.0 $gatkDbSnp \
+		-an DP \
+		-an QD \
+		-an FS \
+		-an MQRankSum \
+		-an ReadPosRankSum \
+		-mode SNP \
+		-tranche 100 -tranche 99.9 -tranche 99.0 -tranche 90.0 \
+		-recalFile analysis/output.recal \
+		-tranchesFile analysis/output.tranches \
+		-rscriptFile analysis/output.plots.R \
+		--maxGaussians 4
+		#-an MQ \
+}
+*/
+
+print "Annotate with SnpEff...\n"
+task ( "analysis/cohort.raw.hc.gatk.vcf" <- "analysis/cohort.raw.hc.vcf" ) {
+	sys annotate_SnpEff_GATK.sh analysis/cohort.raw.hc.gatk.vcf
+}
