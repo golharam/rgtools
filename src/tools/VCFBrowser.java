@@ -46,6 +46,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -127,10 +128,11 @@ public class VCFBrowser extends JFrame {
 	RowFilter<VarTableModel, Object> rowFilter = null;
 	String filterText;
 	
-	private Socket igv_socket = null;
-    private PrintWriter igv_out = null;
-    private BufferedReader igv_in = null;
-
+//	private Socket igv_socket = null;
+//    private PrintWriter igv_out = null;
+//    private BufferedReader igv_in = null;
+	private boolean m_bUseIGV = false;
+	
 	/**
 	 * Launch the application.
 	 */
@@ -210,10 +212,10 @@ public class VCFBrowser extends JFrame {
 		JMenu mnIGV = new JMenu("IGV");
 		menuBar.add(mnIGV);
 		
-		JMenuItem mntmStartIGV = new JMenuItem("Start/Connect to IGV");
+		JMenuItem mntmStartIGV = new JMenuItem("Connect to IGV");
 		mntmStartIGV.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				onStartAndConnectToIGV(e);
+				onConnectToIGV(e);
 			}
 		});
 		mnIGV.add(mntmStartIGV);
@@ -485,6 +487,7 @@ public class VCFBrowser extends JFrame {
 		// If not already connected to IGV,
 		// determine if we should try to connect and if we should, then connect, and initialize
 		// issue navigation commands
+		/*
 		if (igv_out == null) {
 			boolean worthLoading = false;
 			for (String bamFile : bamFiles) {
@@ -505,24 +508,45 @@ public class VCFBrowser extends JFrame {
 			}
 			
 		}
+		*/
+		if (m_bUseIGV) {
+//			private Socket igv_socket = null;
+//		    private PrintWriter igv_out = null;
+//		    private BufferedReader igv_in = null;
+			try {
+				Socket igv_socket = new Socket("127.0.0.1", 60151);
+				if (igv_socket.isConnected()) {
+					PrintWriter igv_out = new PrintWriter(igv_socket.getOutputStream(), true);
+					BufferedReader igv_in = new BufferedReader(new InputStreamReader(igv_socket.getInputStream()));
 				
-		String chr = (String) table.getValueAt(row, 0);
-		Integer pos = (Integer) table.getValueAt(row, 1);
-			
-		log.info("Navigating to " + chr + ": " + pos);
-		
-		igv_out.println("goto " + chr + ":" + pos);
-        String response = null;
-		try {
-			response = igv_in.readLine();
-	        if (response.equals("OK")) {
-	        	log.info("done");
-	        } else {
-	        	log.error("Error: " + response);
-	        	return;
-	        }
-		} catch (IOException e) {
-			log.error("Unable to navigate IGV");
+					String chr = (String) table.getValueAt(row, 0);
+					Integer pos = (Integer) table.getValueAt(row, 1);
+					
+					log.info("Navigating IGV to " + chr + ": " + pos);
+				
+					igv_out.println("goto " + chr + ":" + pos);
+					String response = null;
+					try {
+						response = igv_in.readLine();
+						if (response.equals("OK")) {
+							log.info("IGV done");
+						} else {
+							log.error("IGV Error: " + response);
+						}
+					} catch (IOException e) {
+						log.error("Unable to navigate IGV");
+					}
+					igv_out.close();
+					igv_in.close();
+					igv_socket.close();
+				}				
+			} catch (UnknownHostException e1) {
+				log.error("Unable to connect to IGV");
+				return;
+			} catch (IOException e1) {
+				log.error("Unable to connect to IGV");
+				return;
+			}
 		}
 	}
 	
@@ -607,17 +631,16 @@ public class VCFBrowser extends JFrame {
         return varTableModel.getColumnDescription(colIndex);
 	}
 	
-	protected void onStartAndConnectToIGV(ActionEvent evt) {
+	protected void onConnectToIGV(ActionEvent evt) {
+		/*
 		// If IGV is already running, simply connect to it.
-		// If IGV is not running, start it.
-		// This is what startIGV() does.  If successfully, connect to it.
-		if (startIGV()) {
-			try {
-				connectToIGV();
-			} catch (Exception e) {
-				log.error(e.getMessage());
-			}
-		}
+		try {
+			connectToIGV();
+		} catch (Exception e) {
+			log.error(e.getMessage());
+		}*/
+		m_bUseIGV = true;
+		log.info("Will attempt to use IGV");
 	}
 	
 	protected void onSpecifyBAMFiles(ActionEvent evt) {
@@ -746,8 +769,9 @@ public class VCFBrowser extends JFrame {
 		int selectedRows = table.getSelectedRowCount();		
         statusLabel.setText("Rows: " + varTableModel.getRowCount() + "     " + "Selected Rows: " + selectedRows);
 	}
-	
+	/*
 	private boolean connectToIGV() throws Exception {
+
 		if (isIGVRunning()) {
 			log.info("Initializing IGV communication...");
 			igv_socket = new Socket("127.0.0.1", 60151);
@@ -755,8 +779,11 @@ public class VCFBrowser extends JFrame {
 			igv_in = new BufferedReader(new InputStreamReader(igv_socket.getInputStream()));
 			log.info("done");	
 		}
+
+		
 		return false;
 	}
+
 	private boolean initIGV() throws Exception {
 		if (!isIGVRunning()) {
 			if (!startIGV())
@@ -839,4 +866,5 @@ public class VCFBrowser extends JFrame {
 		log.error("Unable to start or connect to IGV");
 		return false;
 	}
+*/
 }
