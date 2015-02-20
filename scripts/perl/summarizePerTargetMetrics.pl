@@ -14,7 +14,7 @@ while (<IN>) {
 	chomp;
 	my @fields = split(/\t/);
 	my $s = $fields[0];
-	my $per_target_file = `ls $s.*.coverage_per_target_metrics.txt`;
+	my $per_target_file = "analysis/$s.targetRegionCoverage.txt";
 	chomp $per_target_file;
 	if (! -e $per_target_file) {
 		die "Unable to find $per_target_file";
@@ -76,7 +76,7 @@ for my $s (@ORDERED_SAMPLES) {
 }
 
 # 3.  Output header rows
-open(OUT, ">pertargetmetrics.txt") || die "Unable to open pertargetmetrics.txt";
+open(OUT, ">analysis/pertargetmetrics.txt") || die "Unable to open analysis/pertargetmetric.txt";
 print OUT "\t\t\t\t\t";
 for my $s (@ORDERED_SAMPLES) {
 	print OUT "\t";
