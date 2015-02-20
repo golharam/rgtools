@@ -517,7 +517,7 @@ public class VCFBrowser extends JFrame {
 				Socket igv_socket = new Socket("127.0.0.1", 60151);
 				if (igv_socket.isConnected()) {
 					PrintWriter igv_out = new PrintWriter(igv_socket.getOutputStream(), true);
-					BufferedReader igv_in = new BufferedReader(new InputStreamReader(igv_socket.getInputStream()));
+					//BufferedReader igv_in = new BufferedReader(new InputStreamReader(igv_socket.getInputStream()));
 				
 					String chr = (String) table.getValueAt(row, 0);
 					Integer pos = (Integer) table.getValueAt(row, 1);
@@ -525,8 +525,10 @@ public class VCFBrowser extends JFrame {
 					log.info("Navigating IGV to " + chr + ": " + pos);
 				
 					igv_out.println("goto " + chr + ":" + pos);
+/*					
 					String response = null;
 					try {
+						igv_in.
 						response = igv_in.readLine();
 						if (response.equals("OK")) {
 							log.info("IGV done");
@@ -536,8 +538,9 @@ public class VCFBrowser extends JFrame {
 					} catch (IOException e) {
 						log.error("Unable to navigate IGV");
 					}
+*/					
 					igv_out.close();
-					igv_in.close();
+					//igv_in.close();
 					igv_socket.close();
 				}				
 			} catch (UnknownHostException e1) {
