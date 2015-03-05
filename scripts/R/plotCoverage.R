@@ -3,8 +3,9 @@
 # Mean Coverage - Which can be used to see how samples compare with each other
 # Normalized coverage - Which can be used to see how target within samples compare (only within a sample)
 
-samples <- read.table('../samples.txt', header=FALSE)
-x <- read.table(paste(as.matrix(samples$V1)[1], ".dedup_n6dupsRemoved_sorted.per_target_metrics.txt", sep=""), header=TRUE)
+samples <- read.table('bamfiles.txt', header=FALSE)
+x <- read.table(paste(as.matrix(samples$V1)[1], ".perTargetMetrics.txt", sep=""), header=TRUE)
+x$name <- paste(x$chrom, x$start, x$end, sep="_")
 
 nc <- as.data.frame(matrix(nrow=nrow(x), ncol=nrow(samples)))
 colnames(nc) <- samples$V1
@@ -15,7 +16,7 @@ colnames(mc) <- samples$V1
 rownames(mc) <- x$name
 
 for (s in samples$V1) {
-	x <- read.table(paste(s, ".dedup_n6dupsRemoved_sorted.per_target_metrics.txt", sep=""), header=TRUE)
+	x <- read.table(paste(s, ".perTargetMetrics.txt", sep=""), header=TRUE)
 	mc[s] <- x$mean_coverage
 	nc[s] <- x$normalized_coverage
 }
@@ -46,8 +47,24 @@ heatmap.2(nc_mat_data, 		# data
 	  srtCol=45		# angle col labels
 	 )
 dev.off()
+tiff("norm_coverage_per_target.tiff")
+heatmap.2(nc_mat_data,          # data
+          col=my_palette,       # color palette to use
+          cexRow=0.1,           # row label font size
+          cexCol=0.5,           # col label font size
+          srtCol=45             # angle col labels
+         )
+dev.off()
 
 pdf("mean_coverage_per_target.pdf")
+heatmap.2(mc_mat_data,          # data
+          col=my_palette,       # color palette to use
+          cexRow=0.1,           # row label font size
+          cexCol=0.5,           # col label font size
+          srtCol=45             # angle col labels
+         )
+dev.off()
+tiff("mean_coverage_per_target.tiff")
 heatmap.2(mc_mat_data,          # data
           col=my_palette,       # color palette to use
           cexRow=0.1,           # row label font size
