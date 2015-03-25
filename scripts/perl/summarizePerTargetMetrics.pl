@@ -8,13 +8,18 @@ my @ORDERED_SAMPLES;
 my @ORDERED_TARGETS;
 my %TARGETS;
 
+if (scalar(@ARGV) != 1) {
+	print STDERR "Usage: $0 <samples.txt>\n";
+	exit 0;
+}
+
 # 1.  Get list of samples
 open(IN, "<$ARGV[0]") || die "Unable to open $ARGV[0]";
 while (<IN>) {
 	chomp;
 	my @fields = split(/\t/);
 	my $s = $fields[0];
-	my $per_target_file = "analysis/$s.targetRegionCoverage.txt";
+	my $per_target_file = "analysis/coverage/$s.targetRegionCoverage.txt";
 	chomp $per_target_file;
 	if (! -e $per_target_file) {
 		die "Unable to find $per_target_file";
@@ -42,7 +47,9 @@ for my $s (@ORDERED_SAMPLES) {
 		$lineIndex = 22;
 	        while ($lineIndex < scalar(@lines)) {
         	        my @fields = split(/\t/, $lines[$lineIndex]);
-                	my $target = $fields[0];
+                	# This field may not always be defined
+			#my $target = $fields[0];
+                	my $target = $fields[1]."_".$fields[2]."_".$fields[3];
 	                push @ORDERED_TARGETS, $target;
         	        $TARGETS{$target}{'Chromosome'} = $fields[1];
                 	$TARGETS{$target}{'Start'} = $fields[2];
@@ -58,7 +65,9 @@ for my $s (@ORDERED_SAMPLES) {
 	my $targetIndex = 0;
 	while ($lineIndex < scalar(@lines)) {
 		my @fields = split(/\t/, $lines[$lineIndex]);
-		my $target = $fields[0];
+		#my $target = $fields[0];
+		my $target = $fields[1]."_".$fields[2]."_".$fields[3];
+
 		# make sure target matches our list
 		if ($target ne $ORDERED_TARGETS[$targetIndex]) {
 			die "Targets don't match";
@@ -76,32 +85,30 @@ for my $s (@ORDERED_SAMPLES) {
 }
 
 # 3.  Output header rows
-open(OUT, ">analysis/pertargetmetrics.txt") || die "Unable to open analysis/pertargetmetric.txt";
-print OUT "\t\t\t\t\t";
+print "\t\t\t\t\t";
 for my $s (@ORDERED_SAMPLES) {
-	print OUT "\t";
-	print OUT join("\t", "|----------", "-------------", $s, '--------', '----------|');
+	print "\t";
+	print join("\t", "|----------", "-------------", $s, '--------', '----------|');
 }
-print OUT "\n";
-print OUT join("\t", "Target", "Chromosome", "Start", "End", "Strand", "Length");
+print "\n";
+print join("\t", "Target", "Chromosome", "Start", "End", "Strand", "Length");
 for my $s (@ORDERED_SAMPLES) {
-	print OUT "\t";
-	print OUT join("\t", "Total Reads", "Mean Coverage", "AvgPerBaseCoverage", 'Bases@10X', 'PctBases@10X');
+	print "\t";
+	print join("\t", "Total Reads", "Mean Coverage", "AvgPerBaseCoverage", 'Bases@10X', 'PctBases@10X');
 }
-print OUT "\n";
+print "\n";
 
 # 4.  Print out target and sample info
 for my $target (@ORDERED_TARGETS) {
-	print OUT join("\t", $target, $TARGETS{$target}{'Chromosome'}, $TARGETS{$target}{'Start'}, $TARGETS{$target}{'End'}, 
+	print join("\t", $target, $TARGETS{$target}{'Chromosome'}, $TARGETS{$target}{'Start'}, $TARGETS{$target}{'End'}, 
 			 $TARGETS{$target}{'Strand'}, $TARGETS{$target}{'Length'});
 
 	for my $s (@ORDERED_SAMPLES) {
-		print OUT "\t";
-		print OUT join("\t", $SAMPLES{$s}{$target}{'Total Reads'}, $SAMPLES{$s}{$target}{'Mean Coverage'}, 
+		print "\t";
+		print join("\t", $SAMPLES{$s}{$target}{'Total Reads'}, $SAMPLES{$s}{$target}{'Mean Coverage'}, 
 			$SAMPLES{$s}{$target}{'AvgPerBaseCoverage'}, $SAMPLES{$s}{$target}{'Base10X'},
 			$SAMPLES{$s}{$target}{'PctBases10X'});
 	}
-	print OUT "\n";
+	print "\n";
 }
-close(OUT);
 
