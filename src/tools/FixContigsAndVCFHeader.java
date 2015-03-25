@@ -54,17 +54,19 @@ public class FixContigsAndVCFHeader extends CommandLineProgram {
         
         int i = 0;
         for (VariantContext vc : vcfFileReader) {
+        	i++;
+
         	VariantContextBuilder vcBuilder = new VariantContextBuilder(vc);
         	vcBuilder.chr("chr"+vc.getChr());
         	vcfWriter.add(vcBuilder.make());
         	
-        	i++;
         	if ((i % 100000) == 0) {
         		log.info("Written " + i + " variants.");
         	}
         }
         
         vcfWriter.close();
+        log.info("Wrote " + i + " variants.");
 		return 0;
 	}
 
