@@ -6,16 +6,19 @@
 #$ -pe orte 8
 
 # From: https://raw.githubusercontent.com/cc2qe/sandbox/master/unc_rnaseqV2_pipeline.sh
-if [ $# -lt 5 ]
+if [ -z $SAMPLE ] || [ -z $FASTQ1 ] || [ -z $FASTQ2 ] || [ -z $THREADS ] || [ -z $AWS ]
 then
-	echo usage $0 [SAMPLE] [FASTQ1] [FASTQ2] [THREADS] [AWS]
-	exit 1
-else
-	SAMPLE=$1
-	FASTQ1=$2
-	FASTQ2=$3
-	THREADS=$4
-	AWS=$5
+	if [ $# -lt 5 ]
+	then
+		echo usage $0 [SAMPLE] [FASTQ1] [FASTQ2] [THREADS] [AWS]
+		exit 1
+	else
+		SAMPLE=$1
+		FASTQ1=$2
+		FASTQ2=$3
+		THREADS=$4
+		AWS=$5
+	fi
 fi
 
 if [ $AWS == 0 ]; then
@@ -25,9 +28,9 @@ if [ $AWS == 0 ]; then
 	PROJECT_DIR=`pwd`
 else
 	EXT_PKGS_DIR=/ngs/apps
-	REFERENCE_DIR=/ngs/reference
+	REFERENCE_DIR=/ngs/reference/mRNAseq_TCGA/hg19_M_rCRS
 	TMP_DIR=/scratch
-	PROJECT_DIR=/ng20/golharr/CA209-038-RNASeq-TCGA
+	PROJECT_DIR=/ng20/golharr/M2GEN-TCGA
 fi
 
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
@@ -41,7 +44,9 @@ BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
 #RSEM_DIR=$EXT_PKGS_DIR/rsem-1.1.13
 RSEM_DIR=$EXT_PKGS_DIR/rsem-1.2.19
 
-echo "Processing $SAMPLE from seq files $FASTQ1, $FASTQ2 on `uname -n`"
+echo "Processing $SAMPLE from seq files:"
+echo $FASTQ1
+echo $FASTQ2
 date '+%m/%d/%y %H:%M:%S'
 analysis_date_started=$(date +"%s")
 echo
@@ -54,8 +59,8 @@ then
 	mkdir $SAMPLE
 fi
 cd $SAMPLE
-echo "Working in "
-echo `pwd`
+echo "Working in `uname -n`:`pwd`"
+echo
 
 # 0a. Download from S3
 if [ $AWS == 1 ]
@@ -65,17 +70,37 @@ then
 	FQ2=`basename $FASTQ2`
 	if [ ! -e $FQ1 ]
 	then
-		echo "Downloading $FASTQ1"
-		S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FASTQ1 | cut -d ' ' -f 4`
+		echo "Downloading $FQ1"
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ1 | cut -d ' ' -f 4`
 		S3LOC="s3://bmsrd-ngs/$S3LOC"
+		echo aws s3 cp $S3LOC .
 		aws s3 cp $S3LOC .
+
+		if [ $? -ne 0 ]; then
+			echo Error downloading $S3LOC from S3
+			exit -1
+		fi
 	fi
+
 	if [ ! -e $FQ2 ]
 	then
-		echo "Downloading $FASTQ2"
-		S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FASTQ2 | cut -d ' ' -f 4`
+		echo
+		echo "Downloading $FQ2"
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ2 | cut -d ' ' -f 4`
 		S3LOC="s3://bmsrd-ngs/$S3LOC"
+		echo aws s3 cp $S3LOC .
 		aws s3 cp $S3LOC .
+
+                if [ $? -ne 0 ]; then
+                        echo Error downloading $S3LOC from S3
+                        exit -1
+                fi
 	fi
 	FASTQ1=$FQ1
 	FASTQ2=$FQ2
@@ -83,7 +108,11 @@ fi
 
 # 0b. Unzip the fastqs
 if [ ! -e ${SAMPLE}_1.fastq ]; then
+	echo
 	echo "Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
 	gunzip -dc $FASTQ1 > ${SAMPLE}_1.fastq
                                 
 	if [ $? -ne 0 ]; then
@@ -95,6 +124,9 @@ fi
 
 if [ ! -e ${SAMPLE}_2.fastq ]; then
         echo "Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
         gunzip -dc $FASTQ2 > ${SAMPLE}_2.fastq
 
         if [ $? -ne 0 ]; then
@@ -108,6 +140,8 @@ fi
 if [ ! -e prep_1.fastq ]
 then
 	echo "Prepping prep_1.fastq"
+	date '+%m/%d/%y %H:%M:%S'
+	echo 
 
 	java -Xmx512M -jar $UBU_JAR fastq-format --phred33to64 --strip --suffix /1 --in ${SAMPLE}_1.fastq --out prep_1.fastq
 
@@ -121,7 +155,10 @@ fi
 # 2. Format fastq 2 for Mapsplice
 if [ ! -e prep_2.fastq ] 
 then
+	echo
 	echo "Prepping prep_2.fastq"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
 
 	java -Xmx512M -jar $UBU_JAR fastq-format --phred33to64 --strip --suffix /2 --in ${SAMPLE}_2.fastq --out prep_2.fastq
 
@@ -140,8 +177,11 @@ then
 	#python mapsplice_multi_thread.py --fusion --all-chromosomes-files hg19_M_rCRS/hg19_M_rCRS.fa --pairend -X 8 -Q fq --chromosome-filesdir hg19_M_rCRS/chromosomes --Bowtieidx hg19_M_rCRS/ebwt/humanchridx_M_rCRS -1 working/prep_1.fastq -2 working/prep_2.fastq -o SAMPLE_BARCODE 2> working/mapsplice.log
 	## actual command
 	#time python mapsplice.py --fusion --bam -p $THREADS -c ~/refdata/genomes/unc_tcga_hg19/chromosomes --qual-scale phred33 -x ~/refdata/genomes/unc_tcga_hg19/ebwt/humanchridx_M_rCRS -1 ${SAMPLE}_1.fastq -2 ${SAMPLE}_2.fastq -o $SAMPLE.mapsplice > mapsplice.log 2> mapsplice.log
-
+	echo
 	echo "3. Mapsplice"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
 	python $MAPSPLICE_DIR/mapsplice_multi_thread.py --fusion --all-chromosomes-files $REFERENCE --pairend -p $THREADS -X 8 -Q fq --chromosome-files-dir $REFERENCE_DIR/chromosomes --Bowtieidx $REFERENCE_DIR/ebwt/humanchridx_M_rCRS -1 prep_1.fastq -2 prep_2.fastq -o $SAMPLE.mapsplice
 
 	if [ $? -ne 0 ]
@@ -225,20 +265,28 @@ then
 	# rsem-calculate-expression --gcr-output-file --paired-end --bam --estimate-rspd -p 8 working/transcriptome_alignments_filtered.bam /datastore/tier1data/nextgenseq/seqware-analysis/mapsplice_rsem/rsem_ref/hg19_M_rCRS_ref rsem > working/rsem.log 2> working/rsem.log
 
 	# 13. Strip trailing tabs from rsem.isoforms.results
-	perl $UBU_DIR/src/perl/strip_trailing_tabs.pl --input $SAMPLE.rsem.isoforms.results --temp $SAMPLE.rsem.orig.isoforms.results 
+	echo "Strip trailing tabs from rsem.isoforms.results"
+	#perl $UBU_DIR/src/perl/strip_trailing_tabs.pl --input $SAMPLE.rsem.isoforms.results --temp $SAMPLE.rsem.orig.isoforms.results 
+	mv $SAMPLE.rsem.isoforms.results $SAMPLE.rsem.orig.isoforms.results
+	sed 's/\\t\$//g' $SAMPLE.rsem.orig.isoforms.results > $SAMPLE.rsem.isoforms.results
+
 	# 14. Prune isoforms from gene quant file
-	mv $SAMPLE.rsem.genes.results $SAMPLE.rsem.orig.genes.results; sed /^uc0/d $SAMPLE.rsem.orig.genes.results > $SAMPLE.rsem.genes.results
+	echo "Prune isoforms from gene quant file"
+	mv $SAMPLE.rsem.genes.results $SAMPLE.rsem.orig.genes.results
+	sed /^uc0/d $SAMPLE.rsem.orig.genes.results > $SAMPLE.rsem.genes.results
 fi
 
 # 15. Normalize gene quant
 if [ ! -e $SAMPLE.rsem.genes.normalized_results ]
 then
+	echo "Normalize gene quant"
 	perl $UBU_DIR/src/perl/quartile_norm.pl -c 2 -q 75 -t 1000 -o $SAMPLE.rsem.genes.normalized_results $SAMPLE.rsem.genes.results
 fi
 
 # 16. Normalize isoform quant
 if [ ! -e $SAMPLE.rsem.isoforms.normalized_results ]
 then
+	echo "Normalize isoform quant"
 	perl $UBU_DIR/src/perl/quartile_norm.pl -c 2 -q 75 -t 300 -o $SAMPLE.rsem.isoforms.normalized_results $SAMPLE.rsem.isoforms.results
 fi
 
@@ -275,7 +323,8 @@ if [ $AWS == 1 ]
 then
 	rm $FASTQ1 $FASTQ2
 fi
-rm -rf *.fastq *.bam *.bai $SAMPLE.mapsplice/alignments.bam $SAMPLE.mapsplice/logs 
+#rm -rf *.fastq *.bam *.bai $SAMPLE.mapsplice/alignments.bam $SAMPLE.mapsplice/logs 
+rm -rf *.fastq 
 
 cd ..
 if [ $AWS == 0 ]
