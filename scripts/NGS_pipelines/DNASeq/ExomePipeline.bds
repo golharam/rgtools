@@ -1,0 +1,369 @@
+#!/usr/bin/env bds
+
+string fastqValidatorApp = "/ngs/ngs15/golharr/apps/fastQValidator/bin/fastQValidator"
+string fastqcApp = "/ngs/ngs15/golharr/apps/FastQC-0.11.2/fastqc"
+string bwaApp = "/apps/sys/galaxy/external_packages/bin/bwa"
+string bwaReference = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/bwa_index/hg19"
+string javaApp = "/ngs/ngs15/golharr/apps/jre1.7.0_67/bin/java"
+string picardDir = "/ngs/ngs15/golharr/apps/picard-tools-1.119"
+string targetRegionsBedFile = "/ng15/golharr/work/PtStratImmFP/targetRegions/0461081_Covered.sorted.merged.bed"
+string targetRegionsListFile = "/ng15/golharr/work/PtStratImmFP/targetRegions/0461081_Covered.sorted.merged.list"
+string reference = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/hg19.fa"
+string gatkJar = "/ngs/ngs15/golharr/apps/GenomeAnalysisTK-2014.3-17-g0583018/GenomeAnalysisTK.jar"
+string gatkKnownSnps = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/1000G_phase1.snps.high_confidence.hg19.vcf"
+string gatkHapMap = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/hapmap_3.3.hg19.vcf"
+string gatkOmni = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/1000G_omni2.5.hg19.vcf"
+string gatkDbSnp = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/dbsnp_137.hg19.vcf"
+string gatkMills = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/Mills_and_1000G_gold_standard.indels.hg19.vcf"
+string snpEffJar = "/ngs/ngs15/golharr/apps/SnpEff-4.1a-2015-01-14/snpEff.jar"
+
+
+print "Exome Pipeline v1.0\n"
+
+# 1.  Get the cohort of samples to process.  The name of the file is either 
+#     passed on the command line as the first argument, or is assumed to be
+#     in the current directory and named samples.txt
+
+string cohort = "samples.txt"
+if (!cohort.canRead()) {
+	print "ERROR: Unable to locate $cohort\n"
+	print "Usage: ExomePipeline.bds [-cohort <samples.txt>]\n"
+	return -1	
+}
+print "\tcohort: $cohort\n\n"
+
+# 2.  Read in the list of samples including sample name, fastq1, fastq2 and
+#     build a sample list
+
+string[] samples
+string{} fq1
+string{} fq2
+string{} sampleDedupBamFiles
+string{} sampleRealignedBamFiles
+string{} sampleRecalibratedBamFiles
+string{} sampleRawGVCFFiles
+string{} targetRegionCoverageFiles
+
+string[] lines = cohort.readLines()
+for ( string line : lines ) {
+	string sample
+	string fastq1
+	string fastq2
+	(sample, fastq1, fastq2) = line.split('\t')
+
+	samples.add(sample)
+	fq1{sample} = fastq1
+	fq2{sample} = fastq2
+}
+
+# Print out the sample information to see that it was loaded correctly
+#print "Samples:\n"
+#for (string sample : samples) {
+#        print "\t$sample\n"
+#	print "\t" + fq1{sample} + "," + fq2{sample} + "\n"
+#}
+#print "\n"
+
+# For each sample:
+for (string sample : samples) {
+	string fastq1 = fq1{sample}
+        string fastq2 = fq2{sample}
+        
+	# 1.  Validate the FASTQ Files        
+        string outFile = "analysis/qaqc/$sample.fq1.fastqValidator.txt"
+	task (outFile <- fastq1) {
+		sys $fastqValidatorApp --disableSeqIDCheck --file $fastq1 > $outFile 2>&1
+	}
+
+        outFile = "analysis/qaqc/$sample.fq2.fastqValidator.txt"
+	task (outFile <- fastq2) {
+		sys $fastqValidatorApp --disableSeqIDCheck --file $fastq1 > $outFile 2>&1
+	}
+	
+	# 2.  Run FASTQC
+	string suffix = ".gz"
+	string[] outputFiles = ["analysis/qaqc/" + fastq1.baseName(suffix) + "_fastqc.html", "analysis/qaqc/" + fastq1.baseName(suffix) + "_fastqc.zip", \
+				"analysis/qaqc/" + fastq2.baseName(suffix) + "_fastqc.html", "analysis/qaqc/" + fastq2.baseName(suffix) + "_fastqc.zip"]
+	task (outputFiles <- [fastq1, fastq2], cpus := 2) {
+		sys $fastqcApp -t 2 --outdir=analysis/qaqc $fastq1 $fastq2
+	}
+
+	string samFile = "analysis/intermediate/$sample.sam"
+	string bamFile = "analysis/intermediate/$sample.bam"
+
+	# 3.  Map the sample
+	dep (samFile <- [fastq1, fastq2], cpus := 4, taskName := sample+"_bwa") {
+		sys $bwaApp mem -t 4 -M -R '@RG\tID:$sample\tSM:$sample\tLB:$sample\tPL:illumina' $bwaReference $fastq1 $fastq2 > $samFile
+	}
+
+	# 4.  Sort the BAM file	
+	dep (bamFile <- samFile, taskName := sample+"_sortBam") {
+		sys $javaApp -Xmx4G -Djava.io.tmpdir=. -jar $picardDir/SortSam.jar SO=coordinate INPUT=$samFile OUTPUT=$bamFile VALIDATION_STRINGENCY=LENIENT CREATE_INDEX=true
+	}
+
+	# 3.  Collect alignment metrics		
+	string alnSummaryMetricsFile = "analysis/qaqc/$sample.alignment_summary_metrics.txt"
+	dep (alnSummaryMetricsFile <- bamFile) {
+		sys $javaApp -Xmx4G -Djava.io.tmpdir=/scratch2 -jar $picardDir/CollectAlignmentSummaryMetrics.jar I=$bamFile O=$alnSummaryMetricsFile LEVEL=SAMPLE R=$reference
+	}
+
+	# 4.  Mark Duplicates
+	string dedupBamFile = "analysis/intermediate/$sample.dedup.bam"
+	string dedupMetricsFile = "analysis/qaqc/$sample.dedup.metrics"
+	dep ([dedupBamFile, dedupMetricsFile] <- bamFile) {
+		sys $javaApp -Xmx4G -Djava.io.tmpdir=/scratch2 -jar $picardDir/MarkDuplicates.jar I=$bamFile O=$dedupBamFile M=$dedupMetricsFile VALIDATION_STRINGENCY=LENIENT CREATE_INDEX=true
+	}
+
+	# 5.  Collect per target coverage metrics
+	string targetRegionCoverageFile = "analysis/coverage/$sample.targetRegionCoverage.txt"
+	dep (targetRegionCoverageFile <- dedupBamFile) {
+		sys $javaApp -Xmx4G -Djava.io.tmpdir=. -jar /home/golharr/workspace/rgtools/dist/CalculateTargetRegionCoverage.jar B=$dedupBamFile G=$targetRegionsBedFile O=$targetRegionCoverageFile
+	}
+	
+	# 6. Collect hsMetrics and per target metrics
+	string hsMetricsFile = "analysis/qaqc/$sample.hsmetrics.txt"
+	string perTargetMetricsFile = "analysis/coverage/$sample.per_target_metrics.txt"
+	dep ([ hsMetricsFile, perTargetMetricsFile ] <- dedupBamFile) {
+		sys $javaApp -Xmx4G -jar $picardDir/CalculateHsMetrics.jar BI=$targetRegionsListFile TI=$targetRegionsListFile REFERENCE_SEQUENCE=$reference I=$dedupBamFile O=$hsMetricsFile PER_TARGET_COVERAGE=$perTargetMetricsFile
+	}
+	goal(hsMetricsFile)
+
+	sampleDedupBamFiles{sample} = dedupBamFile
+	sampleRealignedBamFiles{sample} = "analysis/intermediate/$sample.dedup.realigned.bam"
+	sampleRecalibratedBamFiles{sample} = "analysis/BAM/$sample.dedup.realigned.recal.bam"
+	targetRegionCoverageFiles{sample} = targetRegionCoverageFile
+}
+
+# 7a. Summarize FastQC Metrics
+# 7b. Summary targetRegionCoverage
+dep ( "analysis/coverage/pertargetmetrics.txt" <- targetRegionCoverageFiles.values()) {
+	sys /home/golharr/workspace/rgtools/scripts/perl/summarizeFastQCMetrics.pl analysis/qaqc > analysis/qaqc/fastqcmetrics.txt
+	sys /home/golharr/workspace/rgtools/scripts/perl/summarizePerTargetMetrics.pl samples.txt > analysis/coverage/pertargetmetrics.txt
+}
+goal("analysis/coverage/pertargetmetrics.txt")
+
+# 8.  Create indel targets
+string indelRealignerTargetsFile = "analysis/intermediate/indelrealigner.list"
+dep ( indelRealignerTargetsFile <- sampleDedupBamFiles.values(), cpus := 64, taskName := "indelTargetCreator") {
+	sys find analysis/intermediate -name '*.dedup.bam' > analysis/intermediate/dedupbamfiles.list; \
+            $javaApp -jar $gatkJar \
+                -T RealignerTargetCreator \
+                -nt 64 \
+                -R $reference \
+                -I analysis/intermediate/dedupbamfiles.list \
+                -o $indelRealignerTargetsFile \
+		-allowPotentiallyMisencodedQuals
+}
+
+# 9.  Realign around indels
+dep ( sampleRealignedBamFiles.values() <- indelRealignerTargetsFile, taskName := "IndelRealigner" ) {
+	sys sed 's/analysis\/intermediate\///' analysis/intermediate/dedupbamfiles.list > analysis/intermediate/dedupbamfiles_nopath.txt; \
+	    cat analysis/intermediate/dedupbamfiles_nopath.txt | sed 's/.bam/.realigned.bam/' | awk '{print "analysis/intermediate/"$1}' > analysis/intermediate/bamfiles.realigned.list; \
+	    paste analysis/intermediate/dedupbamfiles_nopath.txt analysis/intermediate/bamfiles.realigned.list > analysis/intermediate/bamfiles.realigned.map; \
+	    $javaApp -Xmx4G -jar $gatkJar \
+		-T IndelRealigner \
+		-R $reference \
+		-I analysis/intermediate/dedupbamfiles.list \
+		-targetIntervals $indelRealignerTargetsFile \
+		-nWayOut analysis/intermediate/bamfiles.realigned.map \
+		-allowPotentiallyMisencodedQuals
+}
+
+# 7a.  Recalibrate quality scores
+dep ( "analysis/intermediate/recal.table" <- sampleRealignedBamFiles.values(), cpus := 64, taskName := "BaseRecalibrator_Step1") {
+	sys $javaApp -jar $gatkJar \
+		-T BaseRecalibrator \
+		-I analysis/intermediate/bamfiles.realigned.list \
+		-R $reference \
+		-nct 64 \
+		-o analysis/intermediate/recal.table \
+		-knownSites $gatkKnownSnps \
+		--fix_misencoded_quality_scores #\
+		#-L $targetRegionsBedFile
+}
+
+# 7b.  Recalibrate quality scores
+dep ( "analysis/intermediate/post_recal.table" <- "analysis/intermediate/recal.table", cpus := 64, tasName := "BaseRecalibration_Step2" ) {
+	sys $javaApp -jar $gatkJar \
+		-T BaseRecalibrator \
+		-I analysis/intermediate/bamfiles.realigned.list \
+		 -knownSites $gatkKnownSnps \
+		-R $reference \
+		-nct 64 \
+		-BQSR analysis/intermediate/recal.table \
+		-o analysis/intermediate/post_recal.table #\
+		#-L $targetRegionsBedFile
+}
+
+# 7c.  Plot recalibration
+dep ( "analysis/intermediate/recalibration_plots.pdf" <- ["analysis/intermediate/recal.table", "analysis/intermediate/post_recal.table"] ) {
+	sys $javaApp -jar $gatkJar \
+		-T AnalyzeCovariates \
+		-R $reference \
+		-before analysis/intermediate/recal.table \
+		-after analysis/intermediate/post_recal.table \
+		-plots analysis/intermediate/recalibration_plots.pdf
+}
+goal("analysis/intermediate/recalibration_plots.pdf")
+
+# 7d. Output recalibrated BAM files and Call SNPs/Indels in GVCF mode
+string recalBamFiles = ""
+string variantFiles = ""
+for (string sample : samples) {
+	string realignedBamFile = sampleRealignedBamFiles{sample}
+	string recalBamFile = sampleRecalibratedBamFiles{sample}
+	
+	recalBamFiles += " -I " + recalBamFile
+	dep ( recalBamFile <- [ "analysis/intermediate/recal.table", realignedBamFile ], taskName := "PrintReads_$sample") {
+		sys $javaApp -jar $gatkJar \
+			-T PrintReads \
+			-R $reference \
+			-I $realignedBamFile \
+			-BQSR analysis/intermediate/recal.table \
+			-o $recalBamFile
+	}
+
+	# 8a.  Call SNPs/Indels in GVCF mode
+	string vcfFile = "analysis/intermediate/" + sample + ".raw.snps.indels.g.vcf"
+	sampleRawGVCFFiles{sample} = vcfFile
+	variantFiles += " -V " + vcfFile
+	dep ( vcfFile <- recalBamFile, taskName := "HaplotypeCaller_$sample" ) {
+		sys $javaApp -jar $gatkJar \
+			-T HaplotypeCaller \
+			-R $reference \
+			-I $recalBamFile \
+			--emitRefConfidence GVCF \
+			--variant_index_type LINEAR \
+			--variant_index_parameter 128000 \
+			--dbsnp $gatkKnownSnps \
+			-o $vcfFile
+	}
+}	
+
+# 8b.  Call UnifiedGenotyper
+dep ( "analysis/intermediate/cohort.ug.vcf" <- sampleRecalibratedBamFiles.values(), cpus := 80, taskName := "UnifiedGenotyper") {
+	sys $javaApp -jar $gatkJar \
+		-T UnifiedGenotyper \
+		-R $reference \
+		$recalBamFiles \
+		--dbsnp $gatkKnownSnps \
+		-stand_call_conf 50.0 \
+		-stand_emit_conf 10.0 \
+		-L $targetRegionsListFile \
+		-o "analysis/intermediate/cohort.ug.vcf"
+}
+goal("analysis/intermediate/cohort.ug.vcf")
+
+# 9.  Call GenotypeGVCFs (merge GVCFs)
+dep ( "analysis/intermediate/cohort.raw.hc.g.vcf" <- sampleRawGVCFFiles.values(), cpus := 80, taskName := "GenotypeGVCFs") {
+	sys $javaApp -Xmx64G -jar $gatkJar \
+		-R $reference \
+		-T GenotypeGVCFs \
+   		-o analysis/intermediate/cohort.raw.hc.g.vcf \
+		--dbsnp $gatkKnownSnps \
+		-nt 80 \
+		$variantFiles
+}
+
+
+# See http://gatkforums.broadinstitute.org/discussion/1259/which-training-sets-arguments-should-i-use-for-running-vqsr
+# v1
+task ( [ "analysis/intermediate/recalibrate_SNP.recal", "analysis/intermediate/recalibrate_SNP.tranches", "analysis/intermediate/recalibrate_SNP_plots.R" ] <- "analysis/intermediate/cohort.raw.hc.g.vcf", taskName := "VariantRecalibrator_v1") {
+        sys $javaApp -Xmx64G -jar $gatkJar \
+		-T VariantRecalibrator \
+		-R $reference \
+		--input analysis/intermediate/cohort.raw.hc.g.vcf \
+		--resource:hapmap,known=false,training=true,truth=true,prior=15.0 $gatkHapMap \
+		--resource:omni,known=false,training=true,truth=true,prior=12.0 $gatkOmni \
+		--resource:1000G,known=false,training=true,truth=false,prior=10.0 $gatkKnownSnps \
+		--resource:dbsnp,known=true,training=false,trush=false,prior=2.0 $gatkDbSnp \
+		-an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an InbreedingCoeff \
+		-mode SNP \
+		-tranche 100 -tranche 99.9 -tranche 99.0 -tranche 90.0 \
+		-recalFile analysis/intermediate/recalibrate_SNP.recal \
+		-tranchesFile analysis/intermediate/recalibrate_SNP.tranches \
+		-rscriptFile analysis/intermediate/recalibrate_SNP_plots.R
+		# DP should not be used for exomes, only whole genomes
+		#-an DP
+}
+/*
+# v2
+task ( [ "analysis/intermediate2/recalibrate_SNP.recal", "analysis/intermediate2/recalibrate_SNP.tranches", "analysis/intermediate2/recalibrate_SNP_plots.R" ] <- "analysis/intermediate/cohort.raw.hc.g.vcf", taskName := "VariantRecalibrator_v2") {
+        sys $javaApp -Xmx64G -jar $gatkJar \
+		-T VariantRecalibrator \
+		-R $reference \
+		--input analysis/intermediate/cohort.raw.hc.g.vcf \
+		-recalFile analysis/intermediate2/recalibrate_SNP.recal \
+		-tranchesFile analysis/intermediate2/recalibrate_SNP.tranches \
+		-rscriptFile analysis/intermediate2/recalibrate_SNP_plots.R \
+		--resource:hapmap,known=false,training=true,truth=true,prior=15.0 $gatkHapMap \
+		--resource:omni,known=false,training=true,truth=true,prior=12.0 $gatkOmni \
+		--resource:1000G,known=false,training=true,truth=false,prior=10.0 $gatkKnownSnps \
+		--resource:dbsnp,known=true,training=false,trush=false,prior=2.0 $gatkDbSnp \
+		-an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an InbreedingCoeff \
+		-mode SNP \
+		-tranche 100 -tranche 99.9 -tranche 99.5 -tranche 99.0 -tranche 90.0
+		# DP should not be used for exomes, only whole genomes
+		#-an DP
+}
+
+dep ( "analysis/intermediate/cohort_recalibrated_snps.vcf" <- ["analysis/intermediate/recalibrate_SNP.recal", "analysis/intermediate/recalibrate_SNP.tranches"] ) {
+	sys $javaApp -Xmx64G -jar $gatkJar \
+		-T ApplyRecalibration \
+		-R $reference \
+		-input analysis/intermediate/cohort.raw.hc.g.vcf \
+		-mode SNP \
+		--ts_filter_level 99.5 \
+		-tranchesFile analysis/intermediate/recalibrate_SNP.tranches \
+		-recalFile analysis/intermediate/recalibrate_SNP.recal \
+		-o analysis/intermediate/cohort_recalibrated_snps.vcf
+}
+
+dep ( [ "analysis/intermediate/recalibrate_INDEL.recal", "analysis/intermediate/recalibrate_INDEL.tranches", "analysis/intermediate/recalibrate_INDEL_plots.R" ] <- "analysis/intermediate/cohort_recalibrated_snps.vcf") {
+	sys $javaApp -jar $gatkJar \
+		-T VariantRecalibrator \
+		-R $reference \
+		-input analysis/intermediate/cohort_recalibrated_snps.vcf \
+		-resource:mills,known=false,training=true,truth=true,prior=12.0 $gatkMills \
+		-resource:dbsnp,known=true,training=false,truth=false,prior=2.0 $gatkDbSnp \
+		-an QD -an DP -an FS -an MQRankSum -an ReadPosRankSum -an InbreedingCoeff \
+		-mode INDEL \
+		-tranche 100.0 -tranche 99.9 -tranche 99.5 -tranche 99.0 -tranche 90.0 \
+		--maxGaussians 4 \
+		-recalFile analysis/intermediate/recalibrate_INDEL.recal \
+		-tranchesFile analysis/intermediate/recalibrate_INDEL.tranches \
+		-rscriptFile analysis/intermediate/recalibrate_INDEL_plots.R
+}
+
+dep ( "analysis/VCF/cohort_recalibrated_variants.vcf" <- ["analysis/intermediate/recalibrate_INDEL.recal", "analysis/intermediate/recalibrate_INDEL.tranches", "analysis/intermediate/cohort_recalibrated_snps.vcf" ] ) {
+	sys $javaApp -jar $gatkJar \
+		-T ApplyRecalibration \
+		-R $reference \
+		-input analysis/intermediate/cohort_recalibrated_snps.vcf \
+		-mode INDEL \
+		--ts_filter_level 99.0 \
+		-recalFile analysis/intermediate/recalibrate_INDEL.recal \
+		-tranchesFile analysis/intermediate/recalibrate_INDEL.tranches \
+		-o analysis/VCF/cohort_recalibrated_variants.vcf
+}
+
+dep ( "analysis/intermediate/cohort_recalibrated_variants.snpEff.vcf" <- "analysis/VCF/cohort_recalibrated_variants.vcf" ) {
+	sys $javaApp -jar $snpEffJar -c /ngs/ngs15/golharr/apps/SnpEff-4.1a-2015-01-14/snpEff.config -v -o gatk hg19 \
+		analysis/VCF/cohort_recalibrated_variants.vcf > analysis/intermediate/cohort_recalibrated_variants.snpEff.vcf
+}
+
+dep ( "analysis/VCF/cohort_recalibrated_variants.snpEff.annotated.vcf" <- "analysis/intermediate/cohort_recalibrated_variants.snpEff.vcf" ) {
+	sys $javaApp -jar $gatkJar \
+		-T VariantAnnotator \
+		-R $reference \
+		-A SnpEff \
+		--variant analysis/VCF/cohort_recalibrated_variants.vcf \
+		--snpEffFile analysis/intermediate/cohort_recalibrated_variants.snpEff.vcf \
+		-o analysis/VCF/cohort_recalibrated_variants.snpEff.annotated.vcf
+}
+
+dep( "analysis/VCF/cohort_recalibrated_variants.snpEff.annotated.txt" <- "analysis/VCF/cohort_recalibrated_variants.snpEff.annotated.vcf" ) {
+	sys $javaApp -jar /home/golharr/workspace/rgtools/dist/VCFToTab.jar V=analysis/VCF/cohort_recalibrated_variants.snpEff.annotated.vcf O=analysis/VCF/cohort_recalibrated_variants.snpEff.annotated.txt
+}
+goal("analysis/VCF/cohort_recalibrated_variants.snpEff.annotated.txt")
+*/
