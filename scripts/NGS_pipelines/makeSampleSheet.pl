@@ -1,33 +1,36 @@
 #!/usr/bin/env perl
 use strict;
+use File::Basename;
+
+# This script creates a smple sheet of (sample, fq1, fq2)
+# Input is a text file of fq.gz.  FQ files must be named <sample>_[12].fq.gz
 
 my %SAMPLES;
 
 my $cwd = `pwd`;
 chomp $cwd;
 
-print "# Created by Ryan Golhar\n";
-print "# file is used by my scripts to keep track of samples and file locations for pipeline\n";
-print "# Basedir: $cwd";
-print "#Sample\tFastQ1\tFastQ2\n";
-
-for my $gzfile (`ls sourceData/*`) {
+for my $gzfile (`find F14FTSUSAT1059/ -name '*.fq.gz'`) {
 	chomp $gzfile;
-	$gzfile =~ /M2GEN-BMS-(.*)\.clipped\.fastq\.gz/;
-	my $sample = $1;
-	if ($sample =~ /^(.*)_1$/) {
-		my $sample_name = $1;
-		if (defined($SAMPLES{$sample_name}{'fq1'})) {
-			print STDERR "$sample_name fq1 already exists\n";
+
+	# Breakup $gzfile into its parts
+	my @suffixes = (".fq.gz", ".fastq.gz");
+	my ($filename, $dir, $suffix) = fileparse($gzfile, @suffixes);
+
+	# Get the sample name from the filename
+	if ($filename =~ /^(\w+)_pe_1$/) {
+		my $sample = $1;
+		if (defined($SAMPLES{$sample}{'fq1'})) {
+			print STDERR "$sample fq1 already exists\n";
 		} else {
-			$SAMPLES{$sample_name}{'fq1'} = "$cwd/$gzfile";
+			$SAMPLES{$sample}{'fq1'} = "$cwd/$gzfile";
 		}
-	} elsif ($sample =~ /^(.*)_2$/) {
-                my $sample_name = $1;
-		if (defined($SAMPLES{$sample_name}{'fq2'})) {
-			print STDERR "$sample_name fq2 already exists\n";
+	} elsif ($filename =~ /^(.*)_pe_2$/) {
+                my $sample = $1;
+		if (defined($SAMPLES{$sample}{'fq2'})) {
+			print STDERR "$sample fq2 already exists\n";
 		} else {
-			$SAMPLES{$sample_name}{'fq2'} = "$cwd/$gzfile";
+			$SAMPLES{$sample}{'fq2'} = "$cwd/$gzfile";
 		}
 	}
 }
