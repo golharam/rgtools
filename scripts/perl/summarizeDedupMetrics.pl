@@ -1,38 +1,53 @@
 #!/usr/bin/env perl
 use strict;
 
-open(FILE, "<$ARGV[0]") || die "Unable to open $ARGV[0]";
+my %SAMPLES;
 
-my $printHeader = 0;
-my @colNames;
-my $sampleColIndex;
-while (<FILE>) {
+# 1.  Read list of samples
+open(IN, "<samples.txt") || die "Unable to open samples.txt\n";
+while (<IN>) {
 	chomp;
-	next if length($_) == 0;
+	my ($sample) = split(/\t/);
 
-	# Collect the alignment metrics for all the samples
-	if (m/^## METRICS CLASS/) {
-		$_ = <FILE>;
-		if ($printHeader == 0) {
-			print $_;
-			$printHeader = 1;
-		}
-		chomp;
-		@colNames = split(/\t/);
-		$sampleColIndex = 0;
-		while ($colNames[$sampleColIndex] !~ m/LIBRARY/) { $sampleColIndex++ }
-
-		my $line = <FILE>;
-		chomp $line;
-		while ((length($line) != 0) && ($line !~ m/^#/)) {
-			my @fields = split(/\t/, $line);
-			if (length($fields[$sampleColIndex]) > 0) {
-				my $sample = $fields[$sampleColIndex];
-				print "$line\n";		
-			}
-			$line = <FILE>;
-			chomp $line;
-		}
-	}
+	getSampleDedupMetrics($sample);
 }
-close(FILE);
+close(IN);
+printSummary();
+exit(0);
+
+sub getSampleDedupMetrics {
+	my ($sample) = @_;
+
+	open(DEDUP, "<analysis/qaqc/$sample.dedup.metrics") || die "Unable to open analysis/qaqc/$sample.dedup.metrics\n";
+	my @metrics = <DEDUP>;
+	close(DEDUP);
+	chomp @metrics;
+
+	my @fields = split(/\t/, $metrics[6]);
+	my @values = split(/\t/, $metrics[7]);
+
+	for (my $i = 0; $i < (scalar(@fields)); $i++) {
+		$SAMPLES{$sample}{$fields[$i]} = $values[$i];
+	}
+
+}
+
+sub printSummary {
+	my @fields;
+
+	# Print the header
+	for my $sample (sort keys %SAMPLES) {
+		print "\t$sample";
+		@fields = sort keys $SAMPLES{$sample};
+	}
+	print "\n";
+
+	for my $field (@fields) {
+		print "$field";
+		for my $sample (sort keys %SAMPLES) {
+			print "\t".$SAMPLES{$sample}{$field};
+		}
+		print "\n";
+	}
+	print "\n";
+}
