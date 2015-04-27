@@ -1,9 +1,11 @@
 #!/bin/env perl
 use strict;
 
+open(BED, "<$ARGV[0]");
+
 my $targets = 0;
 my $bp = 0;
-while (<STDIN>) {
+while (<BED>) {
 	$targets++;
 	chomp;
 	my ($chr, $start, $end) = split(/\t/);
@@ -12,3 +14,5 @@ while (<STDIN>) {
 }
 
 print "$targets targets spanning $bp bps\n";
+
+close (BED);
