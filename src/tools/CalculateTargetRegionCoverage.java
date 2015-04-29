@@ -150,7 +150,7 @@ public class CalculateTargetRegionCoverage extends CommandLineProgram {
 			return -1;
 		}
 				
-        buffer.append("Target\tChromosome\tStart\tEnd\tStrand\tLength\tTotal Reads\tMean Coverage\tAvgPerBaseCoverage\tBases10X\tPctBases10X\n");
+        buffer.append("Target\tChromosome\tStart\tEnd\tStrand\tLength\tTotal Reads\tMean Coverage\tAvgPerBaseCoverage\tBases10X\tPctBases10X\tBases20X\tPctBases20X\tBases50X\tPctBases50X\tBases100X\tPctBases100X\n");
 
         // iterate over each feature
     	int target = 1;
@@ -249,10 +249,10 @@ public class CalculateTargetRegionCoverage extends CommandLineProgram {
         	buffer.append(feature.getAttribute("name") + "\t" + feature.seqname() + "\t" + feature.location().bioStart() + "\t" + feature.location().bioEnd() + 
         					"\t" + feature.location().bioStrand() + "\t" + feature.location().length() + 
         					"\t" + featureReadCount + "\t" + coverage + "\t" + perBaseAverageCoverage + "\t" + 
-        					bases10x + "\t" + bases10x/(double)feature.location().length() + 
-        					bases20x + "\t" + bases20x/(double)feature.location().length() + 
-        					bases50x + "\t" + bases50x/(double)feature.location().length() + 
-        					bases100x + "\t" + bases100x/(double)feature.location().length() + 
+        					bases10x + "\t" + bases10x/(double)feature.location().length() + "\t" +
+        					bases20x + "\t" + bases20x/(double)feature.location().length() + "\t" +
+        					bases50x + "\t" + bases50x/(double)feature.location().length() + "\t" +
+        					bases100x + "\t" + bases100x/(double)feature.location().length() +
         					"\n");
         }
 
