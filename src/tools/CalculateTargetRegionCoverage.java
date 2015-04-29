@@ -34,7 +34,7 @@ import htsjdk.samtools.util.AsciiWriter;
 import htsjdk.samtools.util.CoordMath;
 
 public class CalculateTargetRegionCoverage extends CommandLineProgram {
-	private static String VERSION = "0.1";
+	private static String VERSION = "0.2";
 	
 	private static final Log log = Log.getInstance(CalculateTargetRegionCoverage.class);
 	
