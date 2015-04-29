@@ -91,6 +91,9 @@ public class CalculateTargetRegionCoverage extends CommandLineProgram {
         long totalPFMappedOnTargetBases = 0;
         long totalPFMappedOnTargetBases0x = 0;
         long totalPFMappedOnTargetBases10x = 0;
+        long totalPFMappedOnTargetBases20x = 0;
+        long totalPFMappedOnTargetBases50x = 0;
+        long totalPFMappedOnTargetBases100x = 0;
 
         long bases_at_normalizedCoverage_greaterThan0_0 = 0;
         long bases_at_normalizedCoverage_greaterThan0_2 = 0;
@@ -191,6 +194,9 @@ public class CalculateTargetRegionCoverage extends CommandLineProgram {
         	// calculate some information regarding this feature
         	totalTargetBases += feature.location().length();
         	int bases10x = 0;
+        	int bases20x = 0;
+        	int bases50x = 0;
+        	int bases100x = 0;
         	double coverage = featureReadCount / (double)feature.location().length();
         	userData.put("ReadCount", String.valueOf(featureReadCount));
         	userData.put("MeanCoverage", String.valueOf(coverage));
@@ -205,6 +211,18 @@ public class CalculateTargetRegionCoverage extends CommandLineProgram {
         		if (perBaseCoverage[i] >= 10) {
         			bases10x++;
         			totalPFMappedOnTargetBases10x++;
+        		}
+        		if (perBaseCoverage[i] >= 20) {
+        			bases20x++;
+        			totalPFMappedOnTargetBases20x++;
+        		}
+        		if (perBaseCoverage[i] >= 50) {
+        			bases50x++;
+        			totalPFMappedOnTargetBases50x++;
+        		}
+        		if (perBaseCoverage[i] >= 100) {
+        			bases100x++;
+        			totalPFMappedOnTargetBases100x++;
         		}
         		
         		normalizedBaseCoverage[i] = perBaseCoverage[i] / perBaseAverageCoverage;
@@ -230,8 +248,12 @@ public class CalculateTargetRegionCoverage extends CommandLineProgram {
         	
         	buffer.append(feature.getAttribute("name") + "\t" + feature.seqname() + "\t" + feature.location().bioStart() + "\t" + feature.location().bioEnd() + 
         					"\t" + feature.location().bioStrand() + "\t" + feature.location().length() + 
-        					"\t" + featureReadCount + "\t" + coverage + "\t" + perBaseAverageCoverage + "\t" + bases10x + "\t" + 
-        					bases10x/(double)feature.location().length() + "\n");
+        					"\t" + featureReadCount + "\t" + coverage + "\t" + perBaseAverageCoverage + "\t" + 
+        					bases10x + "\t" + bases10x/(double)feature.location().length() + 
+        					bases20x + "\t" + bases20x/(double)feature.location().length() + 
+        					bases50x + "\t" + bases50x/(double)feature.location().length() + 
+        					bases100x + "\t" + bases100x/(double)feature.location().length() + 
+        					"\n");
         }
 
         // output header, part 2 
@@ -243,6 +265,9 @@ public class CalculateTargetRegionCoverage extends CommandLineProgram {
 	        out.write("Total Bases Mapped on Target\t" + totalPFMappedOnTargetBases + "\n");
 	        out.write("Total Bases Mapped on Target at 0x\t" + totalPFMappedOnTargetBases0x + "\n");
 	        out.write("Total Bases Mapped on Target at 10x\t" + totalPFMappedOnTargetBases10x + "\n");
+	        out.write("Total Bases Mapped on Target at 20x\t" + totalPFMappedOnTargetBases20x + "\n");
+	        out.write("Total Bases Mapped on Target at 50x\t" + totalPFMappedOnTargetBases50x + "\n");
+	        out.write("Total Bases Mapped on Target at 100x\t" + totalPFMappedOnTargetBases100x + "\n");
 	        out.write("\n");
 	        
 	        // Write out summary coverage information
