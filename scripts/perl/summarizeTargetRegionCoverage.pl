@@ -37,14 +37,14 @@ for my $s (@ORDERED_SAMPLES) {
 	chomp @lines;
 	close(IN);
 
-	my $lineIndex = 21;
+	my $lineIndex = 24;
 	if ($lines[$lineIndex] !~ m/^Target/) {
 		die "File ".$SAMPLES{$s}{'file'}." different than expected\n";
 	}
 
 	# if first time, collect a list of targets
 	if ($have_targets == 0) {
-		$lineIndex = 22;
+		$lineIndex = 25;
 	        while ($lineIndex < scalar(@lines)) {
         	        my @fields = split(/\t/, $lines[$lineIndex]);
                 	# This field may not always be defined
@@ -61,7 +61,7 @@ for my $s (@ORDERED_SAMPLES) {
 		$have_targets = 1;
 	}
 	
-	$lineIndex = 22;
+	$lineIndex = 25;
 	my $targetIndex = 0;
 	while ($lineIndex < scalar(@lines)) {
 		my @fields = split(/\t/, $lines[$lineIndex]);
@@ -78,6 +78,12 @@ for my $s (@ORDERED_SAMPLES) {
 		$SAMPLES{$s}{$target}{'AvgPerBaseCoverage'} = $fields[8];
 		$SAMPLES{$s}{$target}{'Base10X'} = $fields[9];
 		$SAMPLES{$s}{$target}{'PctBases10X'} = $fields[10];
+		$SAMPLES{$s}{$target}{'Base20X'} = $fields[11];
+		$SAMPLES{$s}{$target}{'PctBases20X'} = $fields[12];
+		$SAMPLES{$s}{$target}{'Base50X'} = $fields[13];
+		$SAMPLES{$s}{$target}{'PctBases50X'} = $fields[14];
+		$SAMPLES{$s}{$target}{'Base100X'} = $fields[15];
+		$SAMPLES{$s}{$target}{'PctBases100X'} = $fields[16];
 
 		$lineIndex++;
 		$targetIndex++;
@@ -88,13 +94,16 @@ for my $s (@ORDERED_SAMPLES) {
 print "\t\t\t\t\t";
 for my $s (@ORDERED_SAMPLES) {
 	print "\t";
-	print join("\t", "|----------", "-------------", $s, '--------', '----------|');
+	print join("\t", "|----------", "-------------", $s, '--------', '--------','--------','--------','--------','--------','--------','----------|');
 }
 print "\n";
 print join("\t", "Target", "Chromosome", "Start", "End", "Strand", "Length");
 for my $s (@ORDERED_SAMPLES) {
 	print "\t";
-	print join("\t", "Total Reads", "Mean Coverage", "AvgPerBaseCoverage", 'Bases@10X', 'PctBases@10X');
+	print join("\t", "Total Reads", "Mean Coverage", "AvgPerBaseCoverage", 'Bases@10X', 'PctBases@10X',
+									       'Bases@20X', 'PctBases@20X',
+									       'Bases@50X', 'PctBases@50X',
+									       'Bases@100X', 'PctBases@100X');
 }
 print "\n";
 
@@ -106,8 +115,12 @@ for my $target (@ORDERED_TARGETS) {
 	for my $s (@ORDERED_SAMPLES) {
 		print "\t";
 		print join("\t", $SAMPLES{$s}{$target}{'Total Reads'}, $SAMPLES{$s}{$target}{'Mean Coverage'}, 
-			$SAMPLES{$s}{$target}{'AvgPerBaseCoverage'}, $SAMPLES{$s}{$target}{'Base10X'},
-			$SAMPLES{$s}{$target}{'PctBases10X'});
+			$SAMPLES{$s}{$target}{'AvgPerBaseCoverage'}, 
+			$SAMPLES{$s}{$target}{'Base10X'}, $SAMPLES{$s}{$target}{'PctBases10X'},
+			$SAMPLES{$s}{$target}{'Base20X'}, $SAMPLES{$s}{$target}{'PctBases20X'},
+			$SAMPLES{$s}{$target}{'Base50X'}, $SAMPLES{$s}{$target}{'PctBases50X'},
+			$SAMPLES{$s}{$target}{'Base100X'}, $SAMPLES{$s}{$target}{'PctBases100X'}
+			);
 	}
 	print "\n";
 }

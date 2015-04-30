@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project default="create_run_jar" name="Create Runnable Jar for Project rgtools with Jar-in-Jar Loader">
+    <!--this file was created by Eclipse Runnable JAR Export Wizard-->
+    <!--ANT 1.7 is required                                        -->
+    <target name="create_run_jar">
+        <jar destfile="/home/golharr/workspace/rgtools/dist/StripPairInfoFromReadName.jar">
+            <manifest>
+                <attribute name="Main-Class" value="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"/>
+                <attribute name="Rsrc-Main-Class" value="tools.CalculateTargetRegionCoverage"/>
+                <attribute name="Class-Path" value="."/>
+                <attribute name="Rsrc-Class-Path" value="./ biojava3-genome-3.1.0.jar picard-1.121.jar htsjdk-1.121.jar snpEff.jar commons-lang3-3.1.jar"/>
+            </manifest>
+            <zipfileset src="jar-in-jar-loader.zip"/>
+            <fileset dir="/home/golharr/workspace/rgtools/bin"/>
+            <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="biojava3-genome-3.1.0.jar"/>
+            <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="picard-1.121.jar"/>
+            <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="htsjdk-1.121.jar"/>
+            <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="snpEff.jar"/>
+            <zipfileset dir="/home/golharr/workspace/rgtools/lib" includes="commons-lang3-3.1.jar"/>
+        </jar>
+    </target>
+</project>

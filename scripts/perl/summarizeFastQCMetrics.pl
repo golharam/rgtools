@@ -30,6 +30,8 @@ for my $zipFile (`ls $analysisDir/*_fastqc.zip`) {
 		$RESULTS{$sample}{$category} = $state;
 	}
 	close(SUMMARY);
+
+	`rm -rf $fastQCDir`;
 }
 
 my @SAMPLES = sort keys %RESULTS;
