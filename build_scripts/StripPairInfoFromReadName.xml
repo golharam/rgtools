@@ -6,7 +6,7 @@
         <jar destfile="/home/golharr/workspace/rgtools/dist/StripPairInfoFromReadName.jar">
             <manifest>
                 <attribute name="Main-Class" value="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"/>
-                <attribute name="Rsrc-Main-Class" value="tools.CalculateTargetRegionCoverage"/>
+                <attribute name="Rsrc-Main-Class" value="tools.StripPairInfoFromReadName"/>
                 <attribute name="Class-Path" value="."/>
                 <attribute name="Rsrc-Class-Path" value="./ biojava3-genome-3.1.0.jar picard-1.121.jar htsjdk-1.121.jar snpEff.jar commons-lang3-3.1.jar"/>
             </manifest>
