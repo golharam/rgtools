@@ -5,6 +5,7 @@ import htsjdk.samtools.util.Log;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import picard.cmdline.CommandLineProgram;
 import picard.cmdline.Option;
@@ -23,21 +24,21 @@ public class StripPairInfoFromReadName extends CommandLineProgram {
 
 	private static final Log log = Log.getInstance(StripPairInfoFromReadName.class);
 
-    @Usage public final String USAGE =
-            "Strip read names of suffix";
+	@Usage public final String USAGE =
+		"Strip read names of suffix";
 
-    @Option(shortName="I", doc="Input BAM file")
-    public File BAM;
+	@Option(shortName="I", doc="Input BAM file")
+	public File BAM;
 
-    @Option(shortName="S", doc="Suffix")
-    public String SUFFIX;
+	@Option(shortName="S", doc="Suffix")
+	public List<String> SUFFIX;
 
-    @Option(shortName="O", doc="Output BAM file")
-    public File OUT;
+	@Option(shortName="O", doc="Output BAM file")
+	public File OUT;
 
-    public static void main(final String[] argv) {
-    	System.exit(new StripPairInfoFromReadName().instanceMain(argv));
-    }
+	public static void main(final String[] argv) {
+		System.exit(new StripPairInfoFromReadName().instanceMain(argv));
+	}
 
 	@Override
 	protected int doWork() {
@@ -56,14 +57,13 @@ public class StripPairInfoFromReadName extends CommandLineProgram {
         for (SAMRecord read : inputSam) {
         	String readName = read.getReadName();
 
-        	int suffixLength = SUFFIX.length();
-        	
-        	if (readName.endsWith(SUFFIX)) {
-        		readName = readName.substring(0,  readName.length() - suffixLength);
-        		
-        		read.setReadName(readName);
+        	for (final String suffix : SUFFIX) {
+        		if (readName.endsWith(suffix)) {
+        			readName = readName.substring(0,  readName.length() - suffix.length());
+        			read.setReadName(readName);
+        		}
         	}
-        	
+
         	writer.addAlignment(read);
         	
             if ((count++ % 1000000) == 0) {
