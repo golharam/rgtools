@@ -20,7 +20,7 @@ import os
 api_url = ''
 api_key = ''
 library_to_create = ''
-_debug = 1
+_debug = 0
    
 def main():
     if _debug == 1:
@@ -28,6 +28,10 @@ def main():
       print 'Galaxy API Key: %s' % api_key
       print 'Library to create: %s' % library_to_create
       print ''
+
+    if api_url == None or api_key == None:
+        print "Galaxy API Key and/or URL was not specified"
+        sys.exit(1)
 
     libs = display(api_key, api_url + '/api/libraries', return_formatted=False)
     for library in libs:
@@ -48,12 +52,18 @@ def main():
 if __name__ == '__main__':
     # Get defaults from ~/.galaxy.ini
     config = ConfigParser.RawConfigParser()
-    config.read(os.path.expanduser("~/.galaxy.ini"))
+    if os.path.exists(os.path.expanduser("~/.galaxy.ini")):
+        config.read(os.path.expanduser("~/.galaxy.ini"))
+        api_key = config.get('default', 'api_key')
+        api_url = config.get('default', 'api_url')
+    else:
+        api_key = None
+        api_url = None
 
     # Get library to create and override defaults with options specified on command lne
     parser = argparse.ArgumentParser()
-    parser.add_argument('--api-url', help="Galaxy URL", default=config.get('default', 'api_url'))
-    parser.add_argument('--api-key', help="User's Galaxy Key", default=config.get('default', 'api_key'))
+    parser.add_argument('--api-url', help="Galaxy URL", default=api_url)
+    parser.add_argument('--api-key', help="User's Galaxy Key", default=api_key)
     parser.add_argument('library', help="Name of data library to create")
     args = parser.parse_args()
 
