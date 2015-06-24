@@ -35,7 +35,7 @@ def main():
 
     libs = display(api_key, api_url + '/api/libraries', return_formatted=False)
     for library in libs:
-        if library['name'] == library_to_create:
+        if library['name'] == library_to_create and library['deleted'] == False:
             print 'Error: Library %s already exists.' % library['name']
             sys.exit(1)
 
