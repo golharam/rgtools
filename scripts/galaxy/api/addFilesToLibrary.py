@@ -181,24 +181,44 @@ def main():
         print 'Galaxy API URL: %s' % api_url
         print 'Galaxy API Key: %s' % api_key
         print 'Library: %s' % args.library
-        print 'File: %s' % args.file
-        print ''
-
+        print 'Path to Upload: %s' % args.pathToUpload
+        
     # 1.  Get the Library
     galaxyLibrary = getGalaxyLibrary(args.library)
-    
-    # 2.  Make sure the file doesn't exist in the library
     galaxyLibraryContents = display(args.api_key, args.api_url + "/api/libraries/%s/contents" % galaxyLibrary['id'], return_formatted = False)
-    # Get the base file name
-    fileDest = os.path.basename(args.file)
+
+    if os.path.isfile(args.pathToUpload):
+        print 'File: %s' % args.pathToUpload
     
-    # 3.  Upload the file if it doesn't already exist in the library
-    if doesFileExistsInGalaxy(fileDest, galaxyLibraryContents) == True:
-        print "%s already exists in Galaxy library.  Skipping."
-    else:
-        uploadFileToFolder(galaxyLibrary['root_folder_id'], args.file, fileDest)
+        # 2.  Make sure the file doesn't exist in the library
+        # Get the base file name
+        fileDest = os.path.basename(args.pathToUpload)
+    
+        # 3.  Upload the file if it doesn't already exist in the library
+        if doesFileExistsInGalaxy(fileDest, galaxyLibraryContents) == True:
+            print "%s already exists in Galaxy library.  Skipping."
+        else:
+            uploadFileToFolder(galaxyLibrary['root_folder_id'], args.pathToUpload, fileDest)
 
-
+    if os.path.isdir(args.pathToUpload):
+        print 'Dir: %s' % args.pathToUpload
+              
+        # 3.  Scan the directory for *.fastq.gz and add each file 
+        for root, dirs, files in os.walk(args.pathToUpload):
+            #for dir in dirs:
+            #    print os.path.join(root, dir)
+            for file in files:
+                if (file.endswith('.fastq.gz')):
+                    fileToUpload = os.path.join(root, file)
+                    fileDest = os.path.basename(fileToUpload)
+    
+                    # If the fileDest already exists in the library, skip it
+                    if doesFileExistsInGalaxy(fileDest, galaxyLibraryContents) == True:
+                        print "%s already exists in Galaxy library.  Skipping."
+                    else:
+                        uploadFileToFolder(galaxyLibrary['root_folder_id'], fileToUpload, fileDest)
+                    
+            
 
 if __name__ == '__main__':
     # Get defaults from ~/.galaxy.ini
@@ -215,7 +235,7 @@ if __name__ == '__main__':
     parser.add_argument('--api-url', help="Galaxy URL", default=api_url)
     parser.add_argument('--api-key', help="User's Galaxy Key", default=api_key)
     parser.add_argument('library', help="Name of data library to add files to")
-    parser.add_argument('file', help="File to upload")
+    parser.add_argument('pathToUpload', help="File or Directory to upload")
     args = parser.parse_args()
 
     main()
