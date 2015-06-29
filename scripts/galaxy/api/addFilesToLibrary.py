@@ -16,6 +16,8 @@ import sys
 from common import display
 from common import submit
 import re
+from bioblend import galaxy
+import time
 
 _debug = 1
 
@@ -149,26 +151,30 @@ def main_old():
 '''
 old
 '''   
-def uploadFileToFolder(galaxyFolderId, fileToUpload, fileDestination):
+def uploadFileToFolder(galaxyInstance, galaxyLibraryId, galaxyFolderId, fileToUpload, fileDestination):
     print "Uploading file %s -> %s" % (fileToUpload, fileDestination)
-    data = {}
-    data['folder_id'] = galaxyFolderId
-    data['create_type'] = 'file'
-    data['file_type'] = 'fastq'
-    data['upload_option'] = 'upload_paths'
-    data['filesystem_paths'] = fileToUpload
-    data['link_data_only'] = 'link_to_files'
     
-#    libset = submit(args.api_key, args.api_url + "/api/uuu/%s/contents" % library['id'], data, return_formatted = False)
-#    
-#    for lib in libset:
-#        file_metadata = display(_api_key, _api_url + '/api/libraries/datasets/%s' % lib['id'], return_formatted = False)
-#        while file_metadata['state'] == 'running' or file_metadata['state'] == 'queued':
-#            print 'State is %s.  Sleep for 5 seconds.' % file_metadata['state']
-#            time.sleep(5)
-#            file_metadata = display(_api_key, _api_url + '/api/libraries/datasets/%s' % lib['id'], return_formatted = False)
-#
-#        print 'State is %s' % file_metadata['state']
+#    data = {}
+#    data['folder_id'] = galaxyFolderId
+#    data['source'] = 'admin_path'
+#    data['link_data'] = True
+#    data['preserve_dirs'] = True
+#    data['file_type'] = 'fastq'
+#    data['upload_dataset'] = fileToUpload
+    
+#    data['upload_option'] = 'upload_paths'
+#    data['filesystem_paths'] = fileToUpload
+#    data['link_data_only'] = 'link_to_files'
+    libset = galaxyInstance.libraries.upload_from_galaxy_filesystem(galaxyLibraryId, fileToUpload, None, 'fastq', '', 'link_to_files')
+#    libset = submit(args.api_key, args.api_url + "/api/libraries/datasets", data, return_formatted = True)
+    
+    for lib in libset:
+        file_metadata = display(args.api_key, args.api_url + '/api/libraries/datasets/%s' % lib['id'], return_formatted = False)
+        while file_metadata['state'] == 'running' or file_metadata['state'] == 'queued':
+            print 'State is %s.  Sleep for 5 seconds.' % file_metadata['state']
+            time.sleep(5)
+            file_metadata = display(args.api_key, args.api_url + '/api/libraries/datasets/%s' % lib['id'], return_formatted = False)
+        print 'State is %s' % file_metadata['state']
     
 def doesFileExistsInGalaxy(fileDest, galaxyLibraryContents):
     for entry in galaxyLibraryContents:
@@ -181,10 +187,11 @@ def main():
         print 'Galaxy API URL: %s' % api_url
         print 'Galaxy API Key: %s' % api_key
         print 'Library: %s' % args.library
-        print 'Path to Upload: %s' % args.pathToUpload
         
+    gi = galaxy.GalaxyInstance(url=api_url, key=api_key)
+            
     # 1.  Get the Library
-    galaxyLibrary = getGalaxyLibrary(args.library)
+    galaxyLibrary = gi.libraries.get_libraries(name=args.library, deleted=False)[0]
     galaxyLibraryContents = display(args.api_key, args.api_url + "/api/libraries/%s/contents" % galaxyLibrary['id'], return_formatted = False)
 
     if os.path.isfile(args.pathToUpload):
@@ -198,9 +205,9 @@ def main():
         if doesFileExistsInGalaxy(fileDest, galaxyLibraryContents) == True:
             print "%s already exists in Galaxy library.  Skipping."
         else:
-            uploadFileToFolder(galaxyLibrary['root_folder_id'], args.pathToUpload, fileDest)
-
-    if os.path.isdir(args.pathToUpload):
+            uploadFileToFolder(gi, galaxyLibrary['id'], galaxyLibrary['root_folder_id'], args.pathToUpload, fileDest)
+            
+    elif os.path.isdir(args.pathToUpload):
         print 'Dir: %s' % args.pathToUpload
               
         # 3.  Scan the directory for *.fastq.gz and add each file 
@@ -216,7 +223,7 @@ def main():
                     if doesFileExistsInGalaxy(fileDest, galaxyLibraryContents) == True:
                         print "%s already exists in Galaxy library.  Skipping."
                     else:
-                        uploadFileToFolder(galaxyLibrary['root_folder_id'], fileToUpload, fileDest)
+                        uploadFileToFolder(gi, galaxyLibrary['id'], galaxyLibrary['root_folder_id'], fileToUpload, fileDest)
                     
             
 
