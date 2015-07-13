@@ -39,11 +39,14 @@ def uploadFile(fileToUpload, galaxyInstance, galaxyLibrary, destFolder = '/'):
                 return
         
     # Upload file
-    print "Uploading file %s -> %s:%s" % (fileToUpload, galaxyLibrary['name'], destFolder)
-    result = galaxyInstance.libraries.upload_from_galaxy_filesystem(galaxyLibrary['id'], fileToUpload, galaxyFolder_id, file_type='fastq', link_data_only='link_to_files')
-    print result
-    global _filesUploaded
-    _filesUploaded = _filesUploaded+1
+    if os.access(fileToUpload, os.R_OK):
+        print "Uploading file %s -> %s:%s" % (fileToUpload, galaxyLibrary['name'], destFolder)
+        result = galaxyInstance.libraries.upload_from_galaxy_filesystem(galaxyLibrary['id'], fileToUpload, galaxyFolder_id, file_type='fastq', link_data_only='link_to_files')
+        print result
+        global _filesUploaded
+        _filesUploaded = _filesUploaded+1
+    else:
+        print "%s is not accessbile" % fileToUpload
           
 def main():
     if _debug == 1:
