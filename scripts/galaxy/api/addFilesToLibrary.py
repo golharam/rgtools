@@ -16,7 +16,8 @@ from bioblend import galaxy
 import time
 
 _debug = 1
-    
+_filesUploaded = 0
+
 def uploadFile(fileToUpload, galaxyInstance, galaxyLibrary, destFolder = '/'):        
     # Note: Right now, Galaxy strips .gz files of .gz.  So when searching of files, make sure to compare to data_set file_name
 
@@ -33,16 +34,16 @@ def uploadFile(fileToUpload, galaxyInstance, galaxyLibrary, destFolder = '/'):
     for libraryEntry in libraryContents:
         if libraryEntry['type'] == 'file':            
             dataset = galaxyInstance.libraries.show_dataset(galaxyLibrary['id'], libraryEntry['id']) 
-            print libraryEntry
-            print dataset           
             if fileToUpload == dataset['file_name']:
-                print "File already exists in library: %s" % libraryEntry['name']
+                print "File already exists in library: %s.  Skipping." % libraryEntry['name']
                 return
         
     # Upload file
     print "Uploading file %s -> %s:%s" % (fileToUpload, galaxyLibrary['name'], destFolder)
     result = galaxyInstance.libraries.upload_from_galaxy_filesystem(galaxyLibrary['id'], fileToUpload, galaxyFolder_id, file_type='fastq', link_data_only='link_to_files')
     print result
+    global _filesUploaded
+    _filesUploaded = _filesUploaded+1
           
 def main():
     if _debug == 1:
@@ -57,18 +58,20 @@ def main():
     # 1.
     gi = galaxy.GalaxyInstance(url=args.api_url, key=args.api_key)
     galaxyLibraries = gi.libraries.get_libraries(name=args.library, deleted=False)
-    if len(galaxyLibraries) == 0:
-        print "Unable to locate library %s" % args.library
+    for library in galaxyLibraries:
+        if library['deleted'] == False:
+            galaxyLibrary = library
+
+    if galaxyLibrary == None:
+        print "library %s not found" % args.library
         exit(-1)
-    else:
-        galaxyLibrary = gi.libraries.get_libraries(name=args.library, deleted=False)[0]
-      
+            
     # 2.  Scan the path for readme.txt, *.fastq.gz, *.fq.gz and upload to library
     if os.path.isfile(args.pathToUpload):
         uploadFile(args.pathToUpload, gi, galaxyLibrary)
             
     elif os.path.isdir(args.pathToUpload):
-        if args.pathToUpload.endswith('/'):
+#        if args.pathToUpload.endswith('/'):
             # Upload files in directory to dest
             # 3.  Scan the directory for *.fastq.gz and add each file 
             for root, dirs, files in os.walk(args.pathToUpload):
@@ -78,10 +81,11 @@ def main():
                         fileToUpload = os.path.join(root, file)
                         uploadFile(fileToUpload, gi, galaxyLibrary)
             
-        else:
+#        else:
             # Upload directory and contents 
-            print "make directory and upload to directory"
-            
+#            print "make directory and upload to directory"
+                    
+    print "Uploaded %s files." % _filesUploaded       
                             
 if __name__ == '__main__':
     # Get defaults from ~/.galaxy.ini
