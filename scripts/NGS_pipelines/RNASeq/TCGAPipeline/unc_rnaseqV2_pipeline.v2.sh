@@ -5,26 +5,91 @@
 #$ -j y
 #$ -pe orte 8
 
-# From: https://raw.githubusercontent.com/cc2qe/sandbox/master/unc_rnaseqV2_pipeline.sh
-if [ -z $SAMPLE ] || [ -z $FASTQ1 ] || [ -z $FASTQ2 ] || [ -z $THREADS ] || [ -z $AWS ]
+# Pipeline is from: https://raw.githubusercontent.com/cc2qe/sandbox/master/unc_rnaseqV2_pipeline.sh
+HELP=0
+AWS=0
+
+if [ $# -eq 0 ]
 then
-	if [ $# -lt 5 ]
-	then
-		echo usage $0 [SAMPLE] [FASTQ1] [FASTQ2] [THREADS] [AWS]
-		exit 1
-	else
-		SAMPLE=$1
-		FASTQ1=$2
-		FASTQ2=$3
-		THREADS=$4
-		AWS=$5
-	fi
+	HELP=1
 fi
+
+# Command line arguments and where to download is Ryan Golhar.
+# Use > 1 to consume two arguments per pass in the loop (e.g. each argument has a corresponding value to go with it).
+# Use > 0 to consume one or more arguments per pass in the loop (e.g. some arguments don't have a corresponding value to go with it such as in the --default example).
+while [[ $# > 0 ]]
+do
+	key="$1"
+	case $key in
+		-s|--sample)
+		SAMPLE="$2"
+		shift # past argument
+		;;
+
+		-1|--fastq1)
+		FASTQ1="$2"
+		shift # past argument
+		;;
+
+		-2|--fastq2)
+		FASTQ2="$2"
+		shift # past argument
+		;;
+
+		-t|--threads)
+		THREADS="$2"
+		shift # past argument
+		;;
+
+		-a|--aws)
+		AWS=1
+		;;
+
+		--sraftp)
+		SRAFTP="$2"
+		shift # past argument
+		;;
+
+		-h|--help)
+		HELP=1
+		;;
+
+		*)
+		echo "Unknown option: $key"
+		exit -1
+		;;
+	esac
+	shift	# past argument or value
+done
+
+if [ $HELP == 1 ]; then
+	echo "Usage 1: $0 <options> [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
+	echo "Usage 2: $0 <options> [-s|--sample <SRA ID>] [--sraftp <ftp location>]"
+	echo "Options:"
+	echo "	-t|--threads <threads to use>"
+	echo "	-a|--aws"
+	echo "	-h|--help"
+	exit 0
+fi
+#if [ -z $SAMPLE ] || [ -z $FASTQ1 ] || [ -z $FASTQ2 ] || [ -z $THREADS ] || [ -z $AWS ]
+#then
+#	if [ $# -lt 5 ]
+#	then
+#		echo usage $0 [SAMPLE] [FASTQ1] [FASTQ2] [THREADS] [AWS]
+#		exit 1
+#	else
+#		SAMPLE=$1
+#		FASTQ1=$2
+#		FASTQ2=$3
+#		THREADS=$4
+#		AWS=$5
+#	fi
+#fi
 
 if [ $AWS == 0 ]; then
 	EXT_PKGS_DIR=/apps/sys/galaxy/external_packages
 	REFERENCE_DIR=/ngs/ngs15/golharr/NGS/mRNAseq_TCGA/hg19_M_rCRS
-	TMP_DIR=/dev/shm
+	TMP_DIR=/scratch
 	PROJECT_DIR=`pwd`
 else
 	EXT_PKGS_DIR=/ngs/apps
@@ -33,77 +98,127 @@ else
 	PROJECT_DIR=/ng20/golharr/M2GEN-TCGA
 fi
 
+BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
 #MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multi_threads_2.0.1.9/bin
+PICARD_JAR=$EXT_PKGS_DIR/picard-tools-1.129/picard.jar
+REFERENCE=$REFERENCE_DIR/hg19_M_rCRS.fa
+RGTOOLS_DIR=$EXT_PKGS_DIR/rgtools
+#RSEM_DIR=$EXT_PKGS_DIR/rsem-1.1.13
+RSEM_DIR=$EXT_PKGS_DIR/RSEM-1.2.20
+SAMTOOLS=$EXT_PKGS_DIR/samtools-0.1.19/samtools
+SRA_DIR=$EXT_PKGS_DIR/sratoolkit-2.5.2/bin
 UBU_DIR=$EXT_PKGS_DIR/ubu
 UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
-PICARD_JAR=$EXT_PKGS_DIR/picard-tools-1.129/picard.jar
-SAMTOOLS=$EXT_PKGS_DIR/samtools-0.1.19/samtools
-REFERENCE=$REFERENCE_DIR/hg19_M_rCRS.fa
-BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
-#RSEM_DIR=$EXT_PKGS_DIR/rsem-1.1.13
-RSEM_DIR=$EXT_PKGS_DIR/rsem-1.2.19
 
-echo "Processing $SAMPLE from seq files:"
-echo $FASTQ1
-echo $FASTQ2
+
+# Start Analysis
+echo "Processing $SAMPLE"
+date '+%m/%d/%y %H:%M:%S'
+echo
+
+# Make sample working directory
+cd $TMP_DIR
+if [ ! -d $SAMPLE ]
+then
+        mkdir $SAMPLE
+fi
+cd $SAMPLE
+echo "Working in `uname -n`:`pwd`"
+date '+%m/%d/%y %H:%M:%S'
+echo
+
+# If SRA, download from SRA
+if [ -n $SRAFTP ]
+then
+	if [ ! -e ${SAMPLE}.sra ]
+	then
+		echo "Downloading SRA Sample $SAMPLE"
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		wget -nv $SRAFTP/${SAMPLE}.sra 
+
+		if [ $? -ne 0 ]; then
+			echo "Error downloading $SRAFTP/${SAMPLE}.sra"
+			rm -f ${SAMPLE}.sra
+			exit -1
+		fi
+
+		echo "Finished download."
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+	fi
+	
+	echo "Extracting FastQ file(s) from ${SAMPLE}.sra"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	$SRA_DIR/fastq-dump --split-3 --gzip ${SAMPLE}.sra
+
+	if [ $? -ne 0 ]; then
+		rm -f *.gz
+		echo "Error extracting FASTQ file(s)"
+		exit -1
+	fi
+
+	echo "Finished extracting fastq files"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	exit 0
+fi
+
+echo FASTQ1: $FASTQ1
+echo FASTQ2: $FASTQ2
 date '+%m/%d/%y %H:%M:%S'
 analysis_date_started=$(date +"%s")
 echo
 
-cd $TMP_DIR
-rm -rf $SAMPLE
-
-if [ ! -d $SAMPLE ]
-then
-	mkdir $SAMPLE
-fi
-cd $SAMPLE
-echo "Working in `uname -n`:`pwd`"
-echo
-
-# 0a. Download from S3
+# 0a. Download from kraken
 if [ $AWS == 1 ]
 then
 	echo "Running on AWS"
-	FQ1=`basename $FASTQ1`
-	FQ2=`basename $FASTQ2`
-	if [ ! -e $FQ1 ]
+	BASEFQ1=`basename $FASTQ1`
+	BASEFQ2=`basename $FASTQ2`
+	if [ ! -e $BASEFQ1 ]
 	then
-		echo "Downloading $FQ1"
+		echo "Downloading $BASEFQ1"
 		date '+%m/%d/%y %H:%M:%S'
 		echo
 
-		S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ1 | cut -d ' ' -f 4`
-		S3LOC="s3://bmsrd-ngs/$S3LOC"
-		echo aws s3 cp $S3LOC .
-		aws s3 cp $S3LOC .
+		#S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ1 | cut -d ' ' -f 4`
+		#S3LOC="s3://bmsrd-ngs/$S3LOC"
+		#echo aws s3 cp $S3LOC .
+		#aws s3 cp $S3LOC .
+		scp -q golharr@kraken.pri.bms.com:$FASTQ1 .
 
 		if [ $? -ne 0 ]; then
-			echo Error downloading $S3LOC from S3
+			echo Error downloading $BASEFQ1
 			exit -1
 		fi
 	fi
 
-	if [ ! -e $FQ2 ]
+	if [ ! -e $BASEFQ2 ]
 	then
 		echo
-		echo "Downloading $FQ2"
+		echo "Downloading $BASEFQ2"
 		date '+%m/%d/%y %H:%M:%S'
 		echo
 
-		S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ2 | cut -d ' ' -f 4`
-		S3LOC="s3://bmsrd-ngs/$S3LOC"
-		echo aws s3 cp $S3LOC .
-		aws s3 cp $S3LOC .
+		#S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ2 | cut -d ' ' -f 4`
+		#S3LOC="s3://bmsrd-ngs/$S3LOC"
+		#echo aws s3 cp $S3LOC .
+		#aws s3 cp $S3LOC .
+		scp -q golharr@kraken.pri.bms.com:$FASTQ2 .
 
 		if [ $? -ne 0 ]; then
-			echo Error downloading $S3LOC from S3
+			echo Error downloading $BASEFQ2
 			exit -1
 		fi
 	fi
-	FASTQ1=$FQ1
-	FASTQ2=$FQ2
+	FASTQ1=$BASEFQ1
+	FASTQ2=$BASEFQ2
 fi
 
 # 0b. Unzip the fastqs
@@ -120,6 +235,9 @@ if [ ! -e ${SAMPLE}_1.fastq ]; then
 		rm ${SAMPLE}_1.fastq
 		exit -1
 	fi
+
+	rm $FASTQ1
+	touch $FASTQ1
 fi
 
 if [ ! -e ${SAMPLE}_2.fastq ]; then
@@ -134,6 +252,9 @@ if [ ! -e ${SAMPLE}_2.fastq ]; then
                 rm ${SAMPLE}_2.fastq
                 exit -1
         fi
+
+	rm $FASTQ2
+	touch $FASTQ2
 fi
 
 # 1. Format fastq 1 for Mapsplice
@@ -150,6 +271,9 @@ then
        		rm prep_1.fastq
                 exit -1
         fi
+
+	rm ${SAMPLE}_1.fastq
+	touch ${SAMPLE}_1.fastq
 fi
 
 # 2. Format fastq 2 for Mapsplice
@@ -167,6 +291,9 @@ then
                 rm prep_2.fastq
                 exit -1
         fi
+
+	rm ${SAMPLE}_2.fastq
+	touch ${SAMPLE}_2.fastq
 fi
 
 # 3. Mapsplice
@@ -195,7 +322,11 @@ fi
 # 4. Add read groups
 if [ ! -e $SAMPLE.rg.alignments.bam ]
 then
+	echo
 	echo "4. Add read groups"
+	date '+%m/%d/%y %H:%M:%S'
+        echo
+
 	## omitting these tags because i don't know them for my samples:
 	java -Xmx4G -jar $PICARD_JAR AddOrReplaceReadGroups INPUT=$SAMPLE.mapsplice/alignments.bam OUTPUT=${SAMPLE}.rg.alignments.bam RGSM=${SAMPLE} RGID=${SAMPLE} RGLB=TruSeq RGPL=illumina RGPU=barcode VALIDATION_STRINGENCY=SILENT  TMP_DIR=$TMP_DIR SORT_ORDER=coordinate CREATE_INDEX=true
 
@@ -226,7 +357,11 @@ fi
 # 7. Flagstat
 if [ ! -e ${SAMPLE}.genome.aln.bam.flagstat ]
 then
+	echo
 	echo "7. Flagstat"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
 	$SAMTOOLS flagstat ${SAMPLE}.genome.aln.bam > ${SAMPLE}.genome.aln.bam.flagstat
 fi
 
@@ -237,14 +372,22 @@ fi
 # 9. Sort by chromosome, then read id
 if [ ! -e ${SAMPLE}.alignments.chromReadSorted.bam ]
 then
+	echo
 	echo "Sort by chromosome, then read id"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
 	time perl $UBU_DIR/src/perl/sort_bam_by_reference_and_name.pl --input ${SAMPLE}.genome.aln.bam --output ${SAMPLE}.alignments.chromReadSorted.bam --temp-dir $TMP_DIR --samtools $SAMTOOLS
 fi
 
 # 10. Translate to transcriptome coords
 if [ ! -e ${SAMPLE}.transcriptome.aln.bam ]
 then
+	echo
 	echo "Translate to transcriptome coords"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
 	time java -Xms8g -Xmx8g -jar $UBU_JAR sam-xlate --bed $REFERENCE_DIR/../unc_hg19.bed --in ${SAMPLE}.alignments.chromReadSorted.bam --out ${SAMPLE}.transcriptome.aln.bam --order $REFERENCE_DIR/rsem_ref/hg19_M_rCRS_ref.transcripts.fa --xgtags --reverse
 fi
 
@@ -252,94 +395,131 @@ fi
 # 11. Filter indels, large inserts, zero mapping quality from transcriptome bam
 if [ ! -e ${SAMPLE}.transcriptome.aln.filtered.bam ]
 then
+	echo
 	echo "Filter indels, large inserts, zero mapping quality from transcriptome bam"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
 	time java -Xmx1g -jar $UBU_JAR sam-filter --in ${SAMPLE}.transcriptome.aln.bam --out ${SAMPLE}.transcriptome.aln.filtered.bam --strip-indels --max-insert 10000 --mapq 1
+fi
+
+# Strip read names of /1 and /2 
+if [ ! -e ${SAMPLE}.transcriptome.aln.filtered.stripped.bam ]
+then
+	echo
+	echo Stripping /1 and /2 from read names
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
+	java -jar $RGTOOLS_DIR/StripPairInfoFromReadName.jar I=${SAMPLE}.transcriptome.aln.filtered.bam O=${SAMPLE}.transcriptome.aln.filtered.stripped.bam S="/1" S="/2"
 fi
 
 # 12. RSEM
 if [ ! -e ${SAMPLE}.rsem.genes.results ]
 then
+	echo
 	echo "RSEM"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+	
 	## i don't know why they have a --gcr-output-file flag in their command, but it is not a valid rsem parameter so I'm omitting it
-	time $RSEM_DIR/rsem-calculate-expression --paired-end --bam --estimate-rspd -p $THREADS  ${SAMPLE}.transcriptome.aln.filtered.bam $REFERENCE_DIR/rsem_ref/hg19_M_rCRS_ref $SAMPLE.rsem
+	$RSEM_DIR/rsem-calculate-expression --paired-end --bam --estimate-rspd -p $THREADS  ${SAMPLE}.transcriptome.aln.filtered.stripped.bam $REFERENCE_DIR/rsem_ref/hg19_M_rCRS_ref $SAMPLE.rsem
+
+	if [ $? -ne 0 ]
+	then
+		echo "Error running RSEM"
+		exit -1
+	fi
+
+	echo Completed RSEM
+	date '+%m/%d/%y %H:%M:%S'
+        echo
+
 	## example cmd
 	# rsem-calculate-expression --gcr-output-file --paired-end --bam --estimate-rspd -p 8 working/transcriptome_alignments_filtered.bam /datastore/tier1data/nextgenseq/seqware-analysis/mapsplice_rsem/rsem_ref/hg19_M_rCRS_ref rsem > working/rsem.log 2> working/rsem.log
 
 	# 13. Strip trailing tabs from rsem.isoforms.results
-	echo "Strip trailing tabs from rsem.isoforms.results"
+#	echo
+#	echo "Strip trailing tabs from rsem.isoforms.results"
 	#perl $UBU_DIR/src/perl/strip_trailing_tabs.pl --input $SAMPLE.rsem.isoforms.results --temp $SAMPLE.rsem.orig.isoforms.results 
-	mv $SAMPLE.rsem.isoforms.results $SAMPLE.rsem.orig.isoforms.results
-	sed 's/\\t\$//g' $SAMPLE.rsem.orig.isoforms.results > $SAMPLE.rsem.isoforms.results
+#	mv $SAMPLE.rsem.isoforms.results $SAMPLE.rsem.orig.isoforms.results
+#	sed 's/\\t\$//g' $SAMPLE.rsem.orig.isoforms.results > $SAMPLE.rsem.isoforms.results
 
 	# 14. Prune isoforms from gene quant file
-	echo "Prune isoforms from gene quant file"
-	mv $SAMPLE.rsem.genes.results $SAMPLE.rsem.orig.genes.results
-	sed /^uc0/d $SAMPLE.rsem.orig.genes.results > $SAMPLE.rsem.genes.results
+#	echo
+#	echo "Prune isoforms from gene quant file"
+#	mv $SAMPLE.rsem.genes.results $SAMPLE.rsem.orig.genes.results
+#	sed /^uc0/d $SAMPLE.rsem.orig.genes.results > $SAMPLE.rsem.genes.results
 fi
 
 # 15. Normalize gene quant
-if [ ! -e $SAMPLE.rsem.genes.normalized_results ]
-then
-	echo "Normalize gene quant"
-	perl $UBU_DIR/src/perl/quartile_norm.pl -c 2 -q 75 -t 1000 -o $SAMPLE.rsem.genes.normalized_results $SAMPLE.rsem.genes.results
-fi
+#if [ ! -e $SAMPLE.rsem.genes.normalized_results ]
+#then
+#	echo
+#	echo "Normalize gene quant"
+#	perl $UBU_DIR/src/perl/quartile_norm.pl -c 2 -q 75 -t 1000 -o $SAMPLE.rsem.genes.normalized_results $SAMPLE.rsem.genes.results
+#fi
 
 # 16. Normalize isoform quant
-if [ ! -e $SAMPLE.rsem.isoforms.normalized_results ]
-then
-	echo "Normalize isoform quant"
-	perl $UBU_DIR/src/perl/quartile_norm.pl -c 2 -q 75 -t 300 -o $SAMPLE.rsem.isoforms.normalized_results $SAMPLE.rsem.isoforms.results
-fi
+#if [ ! -e $SAMPLE.rsem.isoforms.normalized_results ]
+#then
+#	echo
+#	echo "Normalize isoform quant"
+#	perl $UBU_DIR/src/perl/quartile_norm.pl -c 2 -q 75 -t 300 -o $SAMPLE.rsem.isoforms.normalized_results $SAMPLE.rsem.isoforms.results
+#fi
 
 # 17. Junction counts
-if [ ! -e $SAMPLE.junction_quantification.txt ]
-then
-	echo Counting splice junctions
-	java -Xmx512M -jar $UBU_JAR sam-junc --junctions $REFERENCE_DIR/../splice_junctions.txt --in $SAMPLE.genome.aln.bam --out $SAMPLE.junction_quantification.txt 
+#if [ ! -e $SAMPLE.junction_quantification.txt ]
+#then
+#	echo
+#	echo Counting splice junctions
+#	java -Xmx512M -jar $UBU_JAR sam-junc --junctions $REFERENCE_DIR/../splice_junctions.txt --in $SAMPLE.genome.aln.bam --out $SAMPLE.junction_quantification.txt 
 	
-	if [ $? -ne 0 ]
-	then
-		echo Error counting splice junctions
-		rm SAMPLE.junction_quantification.txt
-		exit -1
-	fi
-fi
+#	if [ $? -ne 0 ]
+#	then
+#		echo Error counting splice junctions
+#		rm SAMPLE.junction_quantification.txt
+#		exit -1
+#	fi
+#fi
 
 # 18. Exon counts
-if [ ! -e $SAMPLE.bt.exon_quantification.txt ]
-then
-	echo Counting exons
-	$BEDTOOLS/coverageBed -split -abam $SAMPLE.genome.aln.bam -b $REFERENCE_DIR/../composite_exons.bed | perl $REFERENCE_DIR/../normalizeBedToolsExonQuant.pl $SAMPLE.genome.aln.bam $REFERENCE_DIR/../composite_exons.bed > $SAMPLE.bt.exon_quantification.txt 
+#if [ ! -e $SAMPLE.bt.exon_quantification.txt ]
+#then
+#	echo
+#	echo Counting exons
+#	$BEDTOOLS/coverageBed -split -abam $SAMPLE.genome.aln.bam -b $REFERENCE_DIR/../composite_exons.bed | perl $REFERENCE_DIR/../normalizeBedToolsExonQuant.pl $SAMPLE.genome.aln.bam $REFERENCE_DIR/../composite_exons.bed > $SAMPLE.bt.exon_quantification.txt 
 
-	if [ $? -ne 0 ]
-	then
-		echo Error counting exons
-		rm $SAMPLE.bt.exon_quantification.txt
-		exit -1	
-	fi
-fi
+#	if [ $? -ne 0 ]
+#	then
+#		echo Error counting exons
+#		rm $SAMPLE.bt.exon_quantification.txt
+#		exit -1	
+#	fi
+#fi
 
 # 19. Cleanup large intermediate output
 if [ $AWS == 1 ]
 then
 	rm $FASTQ1 $FASTQ2
 fi
-rm -rf *.fastq *.bam *.bai $SAMPLE.mapsplice/alignments.bam
+rm -rf *.fastq 
 
 cd ..
 if [ $AWS == 0 ]
 then
 	mv $SAMPLE ${PROJECT_DIR}/${SAMPLE}.local
 else
-	scp -r $SAMPLE golharr@kraken.pri.bms.com:$PROJECT_DIR
+	#scp -r $SAMPLE golharr@kraken.pri.bms.com:$PROJECT_DIR
+	aws s3 cp --recursive $SAMPLE s3://bmsrd-ngs-M2GEN/
 
 	if [ $? -ne 0 ]
 	then
-		echo Error copying $SAMPLE to kraken
+		echo Error copying $SAMPLE to s3
 		exit -1
 	fi
 
-	rm -rf $SAMPLE
+	rm -rf * 2>/dev/null
 fi
 
 echo
