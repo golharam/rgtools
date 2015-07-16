@@ -16,7 +16,7 @@ fi
 
 # Command line arguments and where to download is Ryan Golhar.
 # Use > 1 to consume two arguments per pass in the loop (e.g. each argument has a corresponding value to go with it).
-# Use > 0 to consume one or more arguments per pass in the loop (e.g. some arguments don't have a corresponding value to go with it such as in the --default example).
+# Use > 0 to consume one or more arguments per pass in the loop (e.g. some arguments don't have a corresponding value to go with it such as --help).
 while [[ $# > 0 ]]
 do
 	key="$1"
@@ -63,10 +63,9 @@ do
 done
 
 if [ $HELP == 1 ]; then
-	echo "Usage 1: $0 <options> [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
-	echo "Usage 2: $0 <options> [-s|--sample <SRA ID>] [--sraftp <ftp location>]"
+	echo "Usage 1: $0 <options> [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>] [-t|--threads <threads to use>]"
+	echo "Usage 2: $0 <options> [-s|--sample <SRA ID>] [--sraftp <ftp location>] [-t|--threads <threads to use>]" 
 	echo "Options:"
-	echo "	-t|--threads <threads to use>"
 	echo "	-a|--aws"
 	echo "	-h|--help"
 	exit 0
@@ -111,7 +110,6 @@ SRA_DIR=$EXT_PKGS_DIR/sratoolkit-2.5.2/bin
 UBU_DIR=$EXT_PKGS_DIR/ubu
 UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
 
-
 # Start Analysis
 echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
@@ -129,7 +127,7 @@ date '+%m/%d/%y %H:%M:%S'
 echo
 
 # If SRA, download from SRA
-if [ -n $SRAFTP ]
+if [ -n "$SRAFTP" ]
 then
 	if [ ! -e ${SAMPLE}.sra ]
 	then
@@ -149,28 +147,46 @@ then
 		date '+%m/%d/%y %H:%M:%S'
 		echo
 	fi
-	
-	echo "Extracting FastQ file(s) from ${SAMPLE}.sra"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
 
-	$SRA_DIR/fastq-dump --split-3 --gzip ${SAMPLE}.sra
+	if [ ! -e ${SAMPLE}_1.fastq.gz ]
+	then	
+		echo "Extracting FastQ file(s) from ${SAMPLE}.sra"
+		date '+%m/%d/%y %H:%M:%S'
+		echo
 
-	if [ $? -ne 0 ]; then
-		rm -f *.gz
-		echo "Error extracting FASTQ file(s)"
-		exit -1
+		$SRA_DIR/fastq-dump --split-3 --gzip ${SAMPLE}.sra
+
+		if [ $? -ne 0 ]; then
+			rm -f *.gz
+			echo "Error extracting FASTQ file(s)"
+			exit -1
+		fi
+
+		if [ ! -e ${SAMPLE}_1.fastq.gz ]
+		then
+			mv ${SAMPLE}.fastq.gz ${SAMPLE}_1.fastq.gz
+		fi
+
+		rm ${SAMPLE}.sra
+		touch ${SAMPLE}.sra
+
+		echo "Finished extracting fastq files"
+	        date '+%m/%d/%y %H:%M:%S'
+        	echo
 	fi
 
-	echo "Finished extracting fastq files"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
-
-	exit 0
+	FASTQ1=${SAMPLE}_1.fastq.gz
+	if [ -e ${SAMPLE}_2.fastq.gz ]
+	then
+		FASTQ2=${SAMPLE}_2.fastq.gz
+	fi
 fi
 
 echo FASTQ1: $FASTQ1
-echo FASTQ2: $FASTQ2
+if [ -n "$FASTQ2" ]
+then
+	echo FASTQ2: $FASTQ2
+fi
 date '+%m/%d/%y %H:%M:%S'
 analysis_date_started=$(date +"%s")
 echo
@@ -214,7 +230,7 @@ then
 
 		if [ $? -ne 0 ]; then
 			echo Error downloading $BASEFQ2
-			exit -1
+		 braryEntry in libraryContents:exit -1
 		fi
 	fi
 	FASTQ1=$BASEFQ1
@@ -240,7 +256,7 @@ if [ ! -e ${SAMPLE}_1.fastq ]; then
 	touch $FASTQ1
 fi
 
-if [ ! -e ${SAMPLE}_2.fastq ]; then
+if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
         echo "Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
 	date '+%m/%d/%y %H:%M:%S'
 	echo
@@ -277,7 +293,7 @@ then
 fi
 
 # 2. Format fastq 2 for Mapsplice
-if [ ! -e prep_2.fastq ] 
+if [ -n "$FASTQ2" ] && [ ! -e prep_2.fastq ] 
 then
 	echo
 	echo "Prepping prep_2.fastq"
@@ -310,7 +326,29 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	python $MAPSPLICE_DIR/mapsplice_multi_thread.py --fusion --all-chromosomes-files $REFERENCE --pairend -p $THREADS -X 8 -Q fq --chromosome-files-dir $REFERENCE_DIR/chromosomes --Bowtieidx $REFERENCE_DIR/ebwt/humanchridx_M_rCRS -1 prep_1.fastq -2 prep_2.fastq -o $SAMPLE.mapsplice
+	# Not sure the last line of parameters are used
+	if [ ! -e prep_2.fastq ]
+	then
+		python $MAPSPLICE_DIR/mapsplice_multi_thread.py \
+			-1 prep_1.fastq \
+			--chromosome-files-dir $REFERENCE_DIR/chromosomes \
+			-o $SAMPLE.mapsplice \
+			--Bowtieidx $REFERENCE_DIR/ebwt/humanchridx_M_rCRS \
+			-Q fq \
+			-X $THREADS \
+			--fusion --all-chromosomes-files $REFERENCE -p $THREADS
+	elif [ -e prep_2.fastq ]
+	then
+		python $MAPSPLICE_DIR/mapsplice_multi_thread.py \
+			-1 prep_1.fastq -2 prep_2.fastq \
+			--chromosome-files-dir $REFERENCE_DIR/chromosomes \
+			-o $SAMPLE.mapsplice \
+			--Bowtieidx $REFERENCE_DIR/ebwt/humanchridx_M_rCRS \
+			-Q fq \
+			-X $THREADS \
+			--pairend \
+			--fusion --all-chromosomes-files $REFERENCE -p $THREADS
+	fi
 
 	if [ $? -ne 0 ]
 	then
@@ -423,7 +461,12 @@ then
         echo
 	
 	## i don't know why they have a --gcr-output-file flag in their command, but it is not a valid rsem parameter so I'm omitting it
-	$RSEM_DIR/rsem-calculate-expression --paired-end --bam --estimate-rspd -p $THREADS  ${SAMPLE}.transcriptome.aln.filtered.stripped.bam $REFERENCE_DIR/rsem_ref/hg19_M_rCRS_ref $SAMPLE.rsem
+	if [ ! -e prep_2.fastq ]
+        then
+		$RSEM_DIR/rsem-calculate-expression --bam --estimate-rspd -p $THREADS  ${SAMPLE}.transcriptome.aln.filtered.stripped.bam $REFERENCE_DIR/rsem_ref/hg19_M_rCRS_ref $SAMPLE.rsem
+	else
+		$RSEM_DIR/rsem-calculate-expression --paired-end --bam --estimate-rspd -p $THREADS  ${SAMPLE}.transcriptome.aln.filtered.stripped.bam $REFERENCE_DIR/rsem_ref/hg19_M_rCRS_ref $SAMPLE.rsem
+	fi
 
 	if [ $? -ne 0 ]
 	then
