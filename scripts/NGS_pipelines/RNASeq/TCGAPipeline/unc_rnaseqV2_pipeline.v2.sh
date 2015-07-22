@@ -6,12 +6,20 @@
 #$ -pe orte 8
 
 # Pipeline is from: https://raw.githubusercontent.com/cc2qe/sandbox/master/unc_rnaseqV2_pipeline.sh
+# RG Version 0.03
 HELP=0
 AWS=0
+OUTDIR=`pwd`
+RUN_FASTQC=0
+DELETE_INTERMEDIATE=0
+THREADS=8
 
 if [ $# -eq 0 ]
 then
-	HELP=1
+	if [ -z "$SAMPLE" ]
+	then
+		HELP=1
+	fi
 fi
 
 # Command line arguments and where to download is Ryan Golhar.
@@ -21,6 +29,14 @@ while [[ $# > 0 ]]
 do
 	key="$1"
 	case $key in
+                --fastqc)
+                RUN_FASTQC=1
+		;;
+
+		--delete-intermediate)
+		DELETE_INTERMEDIATE=1
+		;;
+
 		-s|--sample)
 		SAMPLE="$2"
 		shift # past argument
@@ -54,6 +70,11 @@ do
 		HELP=1
 		;;
 
+                -o|--outdir)
+                OUTDIR="$2"
+		shift # past argument
+		;;
+
 		*)
 		echo "Unknown option: $key"
 		exit -1
@@ -67,37 +88,25 @@ if [ $HELP == 1 ]; then
 	echo "Usage 2: $0 <options> [-s|--sample <SRA ID>] [--sraftp <ftp location>] [-t|--threads <threads to use>]" 
 	echo "Options:"
 	echo "	-a|--aws"
+	echo "  --delete-intermediate (delete intermediate files, not including source fq.gz) (not yet implemented)"
 	echo "	-h|--help"
+	echo "  -o|--outdir <output directory> [default=current working directory]"
+	echo "  --fastqc (default: do not run fastqc)"
 	exit 0
 fi
-#if [ -z $SAMPLE ] || [ -z $FASTQ1 ] || [ -z $FASTQ2 ] || [ -z $THREADS ] || [ -z $AWS ]
-#then
-#	if [ $# -lt 5 ]
-#	then
-#		echo usage $0 [SAMPLE] [FASTQ1] [FASTQ2] [THREADS] [AWS]
-#		exit 1
-#	else
-#		SAMPLE=$1
-#		FASTQ1=$2
-#		FASTQ2=$3
-#		THREADS=$4
-#		AWS=$5
-#	fi
-#fi
 
 if [ $AWS == 0 ]; then
 	EXT_PKGS_DIR=/apps/sys/galaxy/external_packages
 	REFERENCE_DIR=/ngs/ngs15/golharr/NGS/mRNAseq_TCGA/hg19_M_rCRS
 	TMP_DIR=/scratch
-	PROJECT_DIR=`pwd`
 else
 	EXT_PKGS_DIR=/ngs/apps
 	REFERENCE_DIR=/ngs/reference/mRNAseq_TCGA/hg19_M_rCRS
 	TMP_DIR=/scratch
-	PROJECT_DIR=/ng20/golharr/M2GEN-TCGA
 fi
 
 BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
+FASTQC=$EXT_PKGS_DIR/FastQC-0.11.2/fastqc
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
 #MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multi_threads_2.0.1.9/bin
 PICARD_JAR=$EXT_PKGS_DIR/picard-tools-1.129/picard.jar
@@ -115,14 +124,16 @@ echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
 echo
 
-# Make sample working directory
+# Make tmp working directory
 cd $TMP_DIR
-if [ ! -d $SAMPLE ]
+SAMPLE_DIR=`mktemp -d --tmpdir=${TMP_DIR} ${SAMPLE}_XXXXXX`
+if [ ! -d $SAMPLE_DIR ]
 then
-        mkdir $SAMPLE
+        mkdir $SAMPLE_DIR
 fi
-cd $SAMPLE
+cd $SAMPLE_DIR
 echo "Working in `uname -n`:`pwd`"
+echo "Output dir is $OUTDIR"
 date '+%m/%d/%y %H:%M:%S'
 echo
 
@@ -230,7 +241,6 @@ then
 
 		if [ $? -ne 0 ]; then
 			echo Error downloading $BASEFQ2
-		 braryEntry in libraryContents:exit -1
 		fi
 	fi
 	FASTQ1=$BASEFQ1
@@ -239,7 +249,6 @@ fi
 
 # 0b. Unzip the fastqs
 if [ ! -e ${SAMPLE}_1.fastq ]; then
-	echo
 	echo "Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
 	date '+%m/%d/%y %H:%M:%S'
 	echo
@@ -251,9 +260,6 @@ if [ ! -e ${SAMPLE}_1.fastq ]; then
 		rm ${SAMPLE}_1.fastq
 		exit -1
 	fi
-
-	rm $FASTQ1
-	touch $FASTQ1
 fi
 
 if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
@@ -268,9 +274,23 @@ if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
                 rm ${SAMPLE}_2.fastq
                 exit -1
         fi
+fi
 
-	rm $FASTQ2
-	touch $FASTQ2
+# Run FastQC
+if [ "$RUN_FASTQC" -eq 1 ] 
+then
+	echo "Running FastQC"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	if [ -e ${SAMPLE}_2.fastq ]
+	then
+		$FASTQC -t 2 -o . ${SAMPLE}_1.fastq ${SAMPLE}_2.fastq
+	else
+		$FASTQC -o . ${SAMPLE}_1.fastq
+	fi
+
+	echo
 fi
 
 # 1. Format fastq 1 for Mapsplice
@@ -551,18 +571,19 @@ rm -rf *.fastq
 cd ..
 if [ $AWS == 0 ]
 then
-	mv $SAMPLE ${PROJECT_DIR}/${SAMPLE}.local
+	echo "Moving ${SAMPLE_DIR} to ${OUTDIR}/${SAMPLE}"
+	mv ${SAMPLE_DIR} ${OUTDIR}/${SAMPLE}
 else
-	#scp -r $SAMPLE golharr@kraken.pri.bms.com:$PROJECT_DIR
-	aws s3 cp --recursive $SAMPLE s3://bmsrd-ngs-M2GEN/
+	# TBD: This is project specific and needs to be parameterized
+	aws s3 cp --recursive $SAMPLE_DIR s3://bmsrd-ngs-M2GEN/
 
 	if [ $? -ne 0 ]
 	then
-		echo Error copying $SAMPLE to s3
+		echo Error copying $SAMPLE_DIR to s3
 		exit -1
 	fi
 
-	rm -rf * 2>/dev/null
+	rm -rf $SAMPLE_DIR 2>/dev/null
 fi
 
 echo
