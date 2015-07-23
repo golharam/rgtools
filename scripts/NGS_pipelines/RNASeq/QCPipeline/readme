@@ -1,0 +1,6 @@
+This is an RNA-Seq QC pipeline.
+
+runRNASeqQCPipeline.pl	- Runs the pipeline on all the samples specified in the sample sheet.  
+				This script will also download the sample files as necessary (AWS S3, SRA FTP)
+				This script uses the following files:
+rnaseqqc_pipeline.sh	- Actual pipeline (per sample)
