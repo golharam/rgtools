@@ -355,7 +355,8 @@ then
 		R=$REFERENCE_DIR/$REFERENCE/$REFERENCE.fa \
 		INPUT=tophat_out/accepted_hits.bam \
 		OUTPUT=${SAMPLE}.bam \
-		CREATE_INDEX=true
+		CREATE_INDEX=true \
+		TMP_DIR=.
 
         if [ $? -ne 0 ]
         then
@@ -395,8 +396,8 @@ then
         java -Xmx4G -jar $PICARD_JAR CollectInsertSizeMetrics \
                 INPUT=${SAMPLE}.bam \
                 OUTPUT=${SAMPLE}.insertSizeMetrics.txt \
-		HISTOGRAM_FILE=$SAMPLE.insertSizeHistogram.pdf
-		
+		HISTOGRAM_FILE=$SAMPLE.insertSizeHistogram.pdf \
+		TMP_DIR=.
 
         if [ $? -ne 0 ]
         then
