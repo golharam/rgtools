@@ -121,7 +121,7 @@ date '+%m/%d/%y %H:%M:%S'
 echo
 
 # Make tmp working directory aka SAMPLE_DIR
-if [ -z "SAMPLE_DIR" ]
+if [ -z "$SAMPLE_DIR" ]
 then
 	cd $TMP_DIR
 	SAMPLE_DIR=`mktemp -d --tmpdir=${TMP_DIR} ${SAMPLE}_XXXXXX`
@@ -253,6 +253,8 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
+	fastQValidator --file $FASTQ1 > $SAMPLE.fq1Validator.txt
+
 	if [ $? -ne 0 ]
 	then
 		echo "$FASTQ1 is not valid"
@@ -266,6 +268,8 @@ then
         echo "Validating reverse reads ($FASTQ2)"
         date '+%m/%d/%y %H:%M:%S'
         echo
+
+	fastQValidator --file $FASTQ2 > $SAMPLE.fq2Validator.txt
 
         if [ $? -ne 0 ]
         then
