@@ -104,6 +104,7 @@ fi
 
 BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
 FASTQC=$EXT_PKGS_DIR/FastQC-0.11.2/fastqc
+FASTQVALIDATOR=$EXT_PKGS_DIR/fastQValidator-0.1.1a/bin/fastQValidator
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
 #MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multi_threads_2.0.1.9/bin
 PICARD_JAR=$EXT_PKGS_DIR/picard-tools-1.129/picard.jar
@@ -253,7 +254,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	fastQValidator --file $FASTQ1 > $SAMPLE.fq1Validator.txt
+	$FASTQVALIDATOR --file $FASTQ1 > $SAMPLE.fq1Validator.txt
 
 	if [ $? -ne 0 ]
 	then
@@ -269,7 +270,7 @@ then
         date '+%m/%d/%y %H:%M:%S'
         echo
 
-	fastQValidator --file $FASTQ2 > $SAMPLE.fq2Validator.txt
+	$FASTQVALIDATOR --file $FASTQ2 > $SAMPLE.fq2Validator.txt
 
         if [ $? -ne 0 ]
         then
@@ -288,7 +289,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	fastqc --outdir=. --extract -t 2 $FASTQ1 $FASTQ2
+	$FASTQC --outdir=. --extract -t 2 $FASTQ1 $FASTQ2
 
 	if [ $? -ne 0 ]
 	then
