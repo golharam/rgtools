@@ -249,31 +249,49 @@ fi
 
 # 0b. Unzip the fastqs
 if [ ! -e ${SAMPLE}_1.fastq ]; then
-	echo "Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
 
-	gunzip -dc $FASTQ1 > ${SAMPLE}_1.fastq
-                                
-	if [ $? -ne 0 ]; then
-		echo "Error Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
-		rm ${SAMPLE}_1.fastq
-		exit -1
+	FILETYPE=`file $FASTQ1 | cut -f 2 -d ' '`
+
+	if [ "$FILETYPE" == "gzip" ]
+	then
+		echo "Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		gunzip -dc $FASTQ1 > ${SAMPLE}_1.fastq
+	                                
+		if [ $? -ne 0 ]; then
+			echo "Error Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
+			rm ${SAMPLE}_1.fastq
+			exit -1
+		fi
+	else
+		echo "$FASTQ1 is $FILETYPE.  Not uncompressing"
+		ln -s $FASTQ1 ${SAMPLE}_1.fastq
 	fi
 fi
 
 if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
-        echo "Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
 
-        gunzip -dc $FASTQ2 > ${SAMPLE}_2.fastq
+	FILETYPE=`file $FASTQ2 | cut -f 2 -d ' '`
 
-        if [ $? -ne 0 ]; then
-                echo "Error Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
-                rm ${SAMPLE}_2.fastq
-                exit -1
-        fi
+        if [ "$FILETYPE" == "gzip" ]
+        then
+	        echo "Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+	        gunzip -dc $FASTQ2 > ${SAMPLE}_2.fastq
+
+	        if [ $? -ne 0 ]; then
+	                echo "Error Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
+	                rm ${SAMPLE}_2.fastq
+	                exit -1
+		fi
+	else
+		echo "$FASTQ2 is $FILETYPE.  Not uncompressing"
+		ln -s $FASTQ2 ${SAMPLE}_2.fastq
+	fi
 fi
 
 # Run FastQC
