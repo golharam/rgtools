@@ -215,13 +215,13 @@ sub printMetrics {
 
 sub main {
 	if (scalar(@ARGV) != 1) {
-		print STDERR "Usage: $0 <Kmer Contentsamples.txt>\n";
+		print STDERR "Usage: $0 <samples.txt>\n";
 		exit(-1);
 	}
 
 	readSamples($ARGV[0]);
-	#runSamples();
-	#waitForSamples();
+	runSamples();
+	waitForSamples();
 	collectMetrics();
 	printMetrics();
 }

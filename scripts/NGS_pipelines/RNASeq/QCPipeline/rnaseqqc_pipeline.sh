@@ -254,7 +254,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	$FASTQVALIDATOR --file $FASTQ1 > $SAMPLE.fq1Validator.txt
+	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ1 > $SAMPLE.fq1Validator.txt
 
 	if [ $? -ne 0 ]
 	then
@@ -270,7 +270,7 @@ then
         date '+%m/%d/%y %H:%M:%S'
         echo
 
-	$FASTQVALIDATOR --file $FASTQ2 > $SAMPLE.fq2Validator.txt
+	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ2 > $SAMPLE.fq2Validator.txt
 
         if [ $? -ne 0 ]
         then
