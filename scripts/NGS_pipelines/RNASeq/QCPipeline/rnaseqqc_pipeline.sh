@@ -7,8 +7,9 @@
 
 # RG Version 0.1
 # 1.  Set default values.  These can be set via command-line options or environment variables
-HELP=0
 AWS=0
+HELP=0
+SUBSAMPLE=0
 OUTDIR=`pwd`
 DELETE_INTERMEDIATE=0
 THREADS=8
@@ -63,6 +64,10 @@ do
 		shift # past argument
 		;;
 
+		--subsample)
+		SUBSAMPLE=1
+		;;
+
 		-h|--help)
 		HELP=1
 		;;
@@ -81,12 +86,14 @@ do
 done
 
 if [ $HELP == 1 ]; then
-	echo "Usage 1: $0 <options> [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>] [-t|--threads <threads to use>]"
-	echo "Usage 2: $0 <options> [-s|--sample <SRA ID>] [--sraftp <ftp location>] [-t|--threads <threads to use>]" 
+	echo "Usage 1: $0 <options> [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
+	echo "Usage 2: $0 <options> [-s|--sample <SRA ID>] [--sraftp <ftp location>]" 
 	echo "Options:"
 	echo "	-a|--aws"
 	echo "  --delete-intermediate (delete intermediate files, not including source fq.gz) (not yet implemented)"
 	echo "	-h|--help"
+	echo "  --subsample"
+	echo "  -t|--threads"
 	echo "  -o|--outdir <output directory> [default=current working directory]"
 	exit 0
 fi
@@ -300,22 +307,32 @@ then
 fi
 
 # 3.  Subsample
-if [ ! -e ${SAMPLE}_1.fastq ]; then
-	echo "Subsampling for 500000 reads..."
-	date '+%m/%d/%y %H:%M:%S'
+if [ $SUBSAMPLE == 1 ]; then
+	if [ ! -e ${SAMPLE}_1.fastq ]; then
+		echo "Subsampling for 500000 reads..."
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		if [ -n "$FASTQ2" ]; then
+			RandomSubFq -w 500000 -i $FASTQ1 -i $FASTQ2 -o ${SAMPLE}_1.fastq -o ${SAMPLE}_2.fastq
+		else
+			RandomSubFq -w 500000 -i $FASTQ1 -o ${SAMPLE}_1.fastq
+		fi
+
+	        if [ $? -ne 0 ]; then
+	                echo "Error subsampling"
+	                rm ${SAMPLE}_?.fastq
+	                exit -1
+	        fi
+	fi
+else
+	echo "Not subsampling...using entire set of reads..."
 	echo
 
+	ln -s $FASTQ1 ${SAMPLE}_1.fastq
 	if [ -n "$FASTQ2" ]; then
-		RandomSubFq -w 500000 -i $FASTQ1 -i $FASTQ2 -o ${SAMPLE}_1.fastq -o ${SAMPLE}_2.fastq
-	else
-		RandomSubFq -w 500000 -i $FASTQ1 -o ${SAMPLE}_1.fastq
+		ln -s $FASTQ2 ${SAMPLE}_2.fastq
 	fi
-
-        if [ $? -ne 0 ]; then
-                echo "Error subsampling"
-                rm ${SAMPLE}_?.fastq
-                exit -1
-        fi
 fi
 
 # 4.  Run tophat2
