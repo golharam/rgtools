@@ -329,9 +329,9 @@ else
 	echo "Not subsampling...using entire set of reads..."
 	echo
 
-	ln -s $FASTQ1 ${SAMPLE}_1.fastq
+	ln -s $FASTQ1 ${SAMPLE}_1.fastq.gz
 	if [ -n "$FASTQ2" ]; then
-		ln -s $FASTQ2 ${SAMPLE}_2.fastq
+		ln -s $FASTQ2 ${SAMPLE}_2.fastq.gz
 	fi
 fi
 
@@ -343,9 +343,10 @@ then
 	date1=$(date +"%s")
 	echo
 
+	# TBD: Output unaligned reads as well, or else CollectAlignmentMetrics thinks all the reads aligned.
 	tophat2 -p $THREADS \
 		--rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
-		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE ${SAMPLE}_1.fastq ${SAMPLE}_2.fastq
+		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE ${SAMPLE}_1.fastq.gz ${SAMPLE}_2.fastq.gz
 
 	if [ $? -ne 0 ] && [ ! -e tophat_out/accepted_hits.bam ]
 	then

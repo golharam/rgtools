@@ -8,9 +8,9 @@ my %SAMPLES;
 # Order of fields by line:
 # FastQValidator
 # FastQC
-my @ORDERED_FIELDS = ('fq1RawCount' , 'fq2RawCount', 
-		      'sequenceLength', 'pctGC', 'Basic Statistics', 'Per base sequence quality', 'Per tile sequence quality', 'Per sequence quality scores', 'Per base sequence content', 'Per sequence GC content', 'Per base N content', 'Sequence Length Distribution', 'Sequence Duplication Levels', 'Overrepresented sequences', 'Adapter Content', 'Kmer Content');
-my @PICARD_ALNMETRICS = ('SAMPLE', 'LIBRARY', 'READ_GROUP', 'TOTAL_READS', 'PF_READS', 'PF_NOISE_READS', 'PF_READS_ALIGNED', 'PF_ALIGNED_BASES', 'PF_HQ_ALIGNED_READS', 'PF_HQ_ALIGNED_BASES', 'PF_HQ_ALIGNED_Q20_BASES', 'PF_HQ_MEDIAN_MISMATCHES', 'PF_MISMATCH_RATE', 'PF_HQ_ERROR_RATE', 'PF_INDEL_RATE', 'MEAN_READ_LENGTH', 'READS_ALIGNED_IN_PAIRS', 'PCT_READS_ALIGNED_IN_PAIRS', 'BAD_CYCLES', 'STRAND_BALANCE', 'PCT_CHIMERAS', 'PCT_ADAPTER');
+my @FASTQVALIDATOR_METRICS = ('fq1RawCount' , 'fq2RawCount');
+my @FASTQC_METRICS = ('sequenceLength', 'pctGC');
+my @PICARD_ALNMETRICS = ('TOTAL_READS', 'PF_READS', 'PF_NOISE_READS', 'PF_READS_ALIGNED', 'PF_ALIGNED_BASES', 'PF_HQ_ALIGNED_READS', 'PF_HQ_ALIGNED_BASES', 'PF_HQ_ALIGNED_Q20_BASES', 'PF_HQ_MEDIAN_MISMATCHES', 'PF_MISMATCH_RATE', 'PF_HQ_ERROR_RATE', 'PF_INDEL_RATE', 'MEAN_READ_LENGTH', 'READS_ALIGNED_IN_PAIRS', 'PCT_READS_ALIGNED_IN_PAIRS', 'BAD_CYCLES', 'STRAND_BALANCE', 'PCT_CHIMERAS', 'PCT_ADAPTER');
 my @PICARD_INSERTSIZEMETRICS = ('MEDIAN_INSERT_SIZE', 'MEDIAN_ABSOLUTE_DEVIATION', 'MIN_INSERT_SIZE', 'MAX_INSERT_SIZE', 'MEAN_INSERT_SIZE', 'STANDARD_DEVIATION', 'READ_PAIRS', 'PAIR_ORIENTATION', 'WIDTH_OF_10_PERCENT', 'WIDTH_OF_20_PERCENT', 'WIDTH_OF_30_PERCENT', 'WIDTH_OF_40_PERCENT', 'WIDTH_OF_50_PERCENT', 'WIDTH_OF_60_PERCENT', 'WIDTH_OF_70_PERCENT', 'WIDTH_OF_80_PERCENT', 'WIDTH_OF_90_PERCENT', 'WIDTH_OF_99_PERCENT');
 my @PICARD_RNASEQMETRICS = ('PF_BASES', 'PF_ALIGNED_BASES', 'RIBOSOMAL_BASES', 'CODING_BASES', 'UTR_BASES', 'INTRONIC_BASES', 'INTERGENIC_BASES', 'IGNORED_READS', 'CORRECT_STRAND_READS', 'INCORRECT_STRAND_READS', 'PCT_RIBOSOMAL_BASES', 'PCT_CODING_BASES', 'PCT_UTR_BASES', 'PCT_INTRONIC_BASES', 'PCT_INTERGENIC_BASES', 'PCT_MRNA_BASES', 'PCT_USABLE_BASES', 'PCT_CORRECT_STRAND_READS', 'MEDIAN_CV_COVERAGE', 'MEDIAN_5PRIME_BIAS', 'MEDIAN_3PRIME_BIAS', 'MEDIAN_5PRIME_TO_3PRIME_BIAS');
 
@@ -20,6 +20,7 @@ sub readSamples {
 	
 	open(IN, "<$sampleSheet") || die "Unable to open $sampleSheet\n";
 	while (<IN>) {
+		next if ($_ =~ m/^#/);
 		chomp;
 		my @fields = split(/\t/, $_);
 		# Make sure file is properly formatted
@@ -97,7 +98,7 @@ sub collectMetrics {
 		close(F);
 		chomp(@data);
 		if ($data[0] =~ m/containing (\d+) sequences./) {
-			$SAMPLES{$sampleName}{'fq1RawCount'} = $1;
+			$SAMPLES{$sampleName}{'fastQValidator'}{'fq1RawCount'} = $1;
 		}
 		if (-e "$sampleName/$sampleName.fq2Validator.txt") {
 	                open(F, "<$sampleName/$sampleName.fq2Validator.txt") || die "Unable to open $sampleName/$sampleName.fq2Validator.txt";
@@ -105,14 +106,12 @@ sub collectMetrics {
         	        close(F);
                 	chomp(@data);
 	                if ($data[0] =~ m/containing (\d+) sequences./) {
-        	                $SAMPLES{$sampleName}{'fq2RawCount'} = $1;
+        	                $SAMPLES{$sampleName}{'fastQValidator'}{'fq2RawCount'} = $1;
                 	}
 		}
-	
+
 		# Collect FastQC Metrics
-		my $fastq_dir = `basename $SAMPLES{$sampleName}{'fq1'} .fastq.gz`;
-		chomp $fastq_dir;
-		$fastq_dir .= '_fastqc';
+		my $fastq_dir = $sampleName.'_1.fq_fastqc';
 		if (-d "$sampleName/$fastq_dir") {
 			open(F, "<$sampleName/$fastq_dir/fastqc_data.txt") || die "Unable to open $sampleName/$fastq_dir/fastqc_data.txt";
 			@data = <F>;
@@ -120,17 +119,18 @@ sub collectMetrics {
 			chomp(@data);
 
 			if ($data[8] =~ m/Sequence length\t(\d+)/) {
-				$SAMPLES{$sampleName}{'sequenceLength'} = $1;
+				# TBD: This should come from picard::CollectAlignmentMetrics
+				$SAMPLES{$sampleName}{'FastQC'}{'sequenceLength'} = $1;
 			}
 			if ($data[9] =~ m/\%GC\t(\d+)/) {
-				$SAMPLES{$sampleName}{'pctGC'} = $1;
+				$SAMPLES{$sampleName}{'FastQC'}{'pctGC'} = $1;
 			}
 			
 			open(F, "<$sampleName/$fastq_dir/summary.txt") || die "Unable to open $sampleName/$fastq_dir/summary.txt";
 			while (<F>) {
 				chomp;
 				my @data = split(/\t/);
-				$SAMPLES{$sampleName}{$data[1]} = $data[0];
+				$SAMPLES{$sampleName}{'FastQC'}{$data[1]} = $data[0];
 			}
 			close(F);
 		}
@@ -143,7 +143,7 @@ sub collectMetrics {
 		my @fieldNames = split(/\t/, $data[6]);
 		my @fieldValues = split(/\t/, $data[9]);
 		for (my $i = 0; $i < scalar(@fieldNames); $i++) {
-			$SAMPLES{$sampleName}{'picard::AlignmentMetrics::'}{$fieldNames[$i]} = $fieldValues[$i];
+			$SAMPLES{$sampleName}{'picard::AlignmentMetrics'}{$fieldNames[$i]} = $fieldValues[$i];
 		}
 
 		# Collect Picard Insert Size Metrics
@@ -154,7 +154,7 @@ sub collectMetrics {
 		@fieldNames = split(/\t/, $data[6]);
 		@fieldValues = split(/\t/, $data[7]);
 		for (my $i = 0; $i < scalar(@fieldNames); $i++) {
-			$SAMPLES{$sampleName}{'picard::InsertSizeMetrics::'.$fieldNames[$i]} = $fieldValues[$i];
+			$SAMPLES{$sampleName}{'picard::InsertSizeMetrics'}{$fieldNames[$i]} = $fieldValues[$i];
 		}
 
 		# Collect Picard RNA-Seq Metrics
@@ -165,13 +165,13 @@ sub collectMetrics {
 		@fieldNames = split(/\t/, $data[6]);
 		@fieldValues = split(/\t/, $data[7]);
 		for (my $i = 0; $i < scalar(@fieldNames); $i++) {
-			$SAMPLES{$sampleName}{'picard::RNASeqMetrics::'.$fieldNames[$i]} = $fieldValues[$i];
+			$SAMPLES{$sampleName}{'picard::RNASeqMetrics'}{$fieldNames[$i]} = $fieldValues[$i];
 		}
 	}
 }
 
 sub printMetrics {
-	for my $fields (@ORDERED_FIELDS, @PICARD_ALNMETRICS, @PICARD_INSERTSIZEMETRICS, @PICARD_RNASEQMETRICS) {
+	for my $fields (@FASTQVALIDATOR_METRICS, @FASTQC_METRICS, @PICARD_ALNMETRICS, @PICARD_INSERTSIZEMETRICS, @PICARD_RNASEQMETRICS) {
 		print "\t$fields";
 	}
 	print "\n";
@@ -179,32 +179,37 @@ sub printMetrics {
 	for my $sampleName (sort keys %SAMPLES) {
 		print "$sampleName";
 
-		# Print out FastQValidator and FastQC fields
-		for my $fields (@ORDERED_FIELDS) {
-			print "\t".$SAMPLES{$sampleName}{$fields};
+		# Print out FastQValidator
+		for my $fields (@FASTQVALIDATOR_METRICS) {
+			print "\t".$SAMPLES{$sampleName}{'fastQValidator'}{$fields};
+		}
+
+		# Print out FastQC
+		for my $fields (@FASTQC_METRICS) {
+			print "\t".$SAMPLES{$sampleName}{'FastQC'}{$fields};
 		}
 
 		# Print out Picard Alignment Metrics
 		for my $fields (@PICARD_ALNMETRICS) {
 			print "\t";
-			if (defined($SAMPLES{$sampleName}{'picard::AlignmentMetrics::'}{$fields})) {
-				print $SAMPLES{$sampleName}{'picard::AlignmentMetrics::'}{$fields};
+			if (defined($SAMPLES{$sampleName}{'picard::AlignmentMetrics'}{$fields})) {
+				print $SAMPLES{$sampleName}{'picard::AlignmentMetrics'}{$fields};
 			}
 		}
 
 		# Print out Picard Insert Size Metrics
 		for my $fields (@PICARD_INSERTSIZEMETRICS) {
 			print "\t";
-			if (defined($SAMPLES{$sampleName}{'picard::InsertSizeMetrics::'}{$fields})) {
-				print $SAMPLES{$sampleName}{'picard::InsertSizeMetrics::'}{$fields};
+			if (defined($SAMPLES{$sampleName}{'picard::InsertSizeMetrics'}{$fields})) {
+				print $SAMPLES{$sampleName}{'picard::InsertSizeMetrics'}{$fields};
 			}
 		}
 
 		# Print out Picard RNA-Seq Metrics
 		for my $fields (@PICARD_RNASEQMETRICS) {
 			print "\t";
-			if (defined($SAMPLES{$sampleName}{'picard::RNASeqMetrics::'}{$fields})) {
-				print $SAMPLES{$sampleName}{'picard::RNASeqMetrics::'}{$fields};
+			if (defined($SAMPLES{$sampleName}{'picard::RNASeqMetrics'}{$fields})) {
+				print $SAMPLES{$sampleName}{'picard::RNASeqMetrics'}{$fields};
 			}
 		}
 
