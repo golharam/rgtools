@@ -6,10 +6,9 @@
 #$ -pe orte 8
 
 # RG Version 0.1
-# 1.  Set default values.  These can be set via command-line options or environment variables
+# 1.  Set default values.  These can be set via command-line options only.  Setting them here overrides environment variables
 AWS=0
 HELP=0
-SUBSAMPLE=0
 OUTDIR=`pwd`
 DELETE_INTERMEDIATE=0
 THREADS=8
@@ -65,7 +64,8 @@ do
 		;;
 
 		--subsample)
-		SUBSAMPLE=1
+		SUBSAMPLE="$2"
+		shift # past argument
 		;;
 
 		-h|--help)
@@ -92,7 +92,7 @@ if [ $HELP == 1 ]; then
 	echo "	-a|--aws"
 	echo "  --delete-intermediate (delete intermediate files, not including source fq.gz) (not yet implemented)"
 	echo "	-h|--help"
-	echo "  --subsample"
+	echo "  --subsample [# of reads]"
 	echo "  -t|--threads"
 	echo "  -o|--outdir <output directory> [default=current working directory]"
 	exit 0
@@ -126,6 +126,7 @@ UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
 # Start Analysis
 echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
+echo "Subsample: $SUBSAMPLE"
 echo
 
 # Make tmp working directory aka SAMPLE_DIR
@@ -307,16 +308,16 @@ then
 fi
 
 # 3.  Subsample
-if [ $SUBSAMPLE == 1 ]; then
+if [ "$SUBSAMPLE" -ne "0" ]; then
 	if [ ! -e ${SAMPLE}_1.fastq ]; then
-		echo "Subsampling for 500000 reads..."
+		echo "Subsampling for $SUBSAMPLE reads..."
 		date '+%m/%d/%y %H:%M:%S'
 		echo
 
 		if [ -n "$FASTQ2" ]; then
-			RandomSubFq -w 500000 -i $FASTQ1 -i $FASTQ2 -o ${SAMPLE}_1.fastq -o ${SAMPLE}_2.fastq
+			RandomSubFq -w $SUBSAMPLE -i $FASTQ1 -i $FASTQ2 -o ${SAMPLE}_1.fastq -o ${SAMPLE}_2.fastq
 		else
-			RandomSubFq -w 500000 -i $FASTQ1 -o ${SAMPLE}_1.fastq
+			RandomSubFq -w $SUBSAMPLE -i $FASTQ1 -o ${SAMPLE}_1.fastq
 		fi
 
 	        if [ $? -ne 0 ]; then
@@ -324,6 +325,11 @@ if [ $SUBSAMPLE == 1 ]; then
 	                rm ${SAMPLE}_?.fastq
 	                exit -1
 	        fi
+
+		gzip ${SAMPLE}_1.fastq
+		if [ -n "$FASTQ2" ]; then
+			gzip ${SAMPLE}_2.fastq
+		fi
 	fi
 else
 	echo "Not subsampling...using entire set of reads..."
