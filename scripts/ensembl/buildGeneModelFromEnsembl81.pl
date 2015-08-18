@@ -19,7 +19,8 @@ open(RRNAGTF, ">rRNA.gtf") || die "Unable to open rRNA.gtf\n";
 while(<GTF>) {
 	next if (m/^#/);
 	my @fields = split(/\t/, $_);
-	if (($fields[1] =~ m/rRNA/) && ($fields[2] =~ m/gene/)) {
+
+	if (($fields[8] =~ m/gene_biotype "rRNA"/) && ($fields[2] =~ m/gene/)) {
 		print RRNAGTF $_;
 	} elsif ($fields[2] =~ m/gene/) {
 		print GENESGTF $_;
@@ -39,14 +40,19 @@ print STDERR "Sorting GTF files\n";
 `subtractBed -s -a genes.gtf -b exons.gtf > introns.gtf`;
 `sortBed -i introns.gtf > introns.sorted.gtf`;
 
+`mv genes.sorted.gtf genes.gtf`;
+`mv exons.sorted.gtf exons.gtf`;
+`mv introns.sorted.gtf introns.gtf`;
+`mv rRNA.sorted.gtf rRNA.gtf`;
+
 print STDERR "Indexing GTF files\n";
-`/apps/sys/galaxy/external_packages/igvtools-2.3.57/IGVTools/igvtools index genes.sorted.gtf`;
-`/apps/sys/galaxy/external_packages/igvtools-2.3.57/IGVTools/igvtools index exons.sorted.gtf`;
-`/apps/sys/galaxy/external_packages/igvtools-2.3.57/IGVTools/igvtools index introns.sorted.gtf`;
-`/apps/sys/galaxy/external_packages/igvtools-2.3.57/IGVTools/igvtools index rRNA.sorted.gtf`;
+`/apps/sys/galaxy/external_packages/igvtools-2.3.57/IGVTools/igvtools index genes.gtf`;
+`/apps/sys/galaxy/external_packages/igvtools-2.3.57/IGVTools/igvtools index exons.gtf`;
+`/apps/sys/galaxy/external_packages/igvtools-2.3.57/IGVTools/igvtools index introns.gtf`;
+`/apps/sys/galaxy/external_packages/igvtools-2.3.57/IGVTools/igvtools index rRNA.gtf`;
 
 print STDERR "Convert GTF to BED\n";
-`gtf2bed < genes.sorted.gtf > genes.bed`;
-`gtf2bed < exons.sorted.gtf > exons.bed`;
-`gtf2bed < introns.sorted.gtf > introns.bed`;
-`gtf2bed < rRNA.sorted.gtf > rRNA.bed`;
+`gtf2bed < genes.gtf > genes.bed`;
+`gtf2bed < exons.gtf > exons.bed`;
+`gtf2bed < introns.gtf > introns.bed`;
+`gtf2bed < rRNA.gtf > rRNA.bed`;
