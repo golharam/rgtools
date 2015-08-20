@@ -10,27 +10,30 @@ my %SAMPLES;
 my $cwd = `pwd`;
 chomp $cwd;
 
-for my $gzfile (`find F14FTSUSAT1059/ -name '*.fq.gz'`) {
+# allsamples.txt should be a text file of all the fastq.gz files
+# Typically made with: find <path> -name '*.fastq.gz
+for my $gzfile (`cat allsamples.txt`) {
 	chomp $gzfile;
 
 	# Breakup $gzfile into its parts
-	my @suffixes = (".fq.gz", ".fastq.gz");
+	my @suffixes = (".clipped.fastq.gz", ".fq.gz", ".fastq.gz");
 	my ($filename, $dir, $suffix) = fileparse($gzfile, @suffixes);
 
 	# Get the sample name from the filename
-	if ($filename =~ /^(\w+)_pe_1$/) {
+	if ($filename =~ /^(.*)_1$/) {
 		my $sample = $1;
 		if (defined($SAMPLES{$sample}{'fq1'})) {
 			print STDERR "$sample fq1 already exists\n";
 		} else {
-			$SAMPLES{$sample}{'fq1'} = "$cwd/$gzfile";
+			$SAMPLES{$sample}{'fq1'} = "$gzfile";
+			$SAMPLES{$sample}{'dir'} = $dir;
 		}
-	} elsif ($filename =~ /^(.*)_pe_2$/) {
-                my $sample = $1;
+	} elsif ($filename =~ /^(.*)_2$/) {
+		my $sample = $1;
 		if (defined($SAMPLES{$sample}{'fq2'})) {
 			print STDERR "$sample fq2 already exists\n";
 		} else {
-			$SAMPLES{$sample}{'fq2'} = "$cwd/$gzfile";
+			$SAMPLES{$sample}{'fq2'} = "$gzfile";
 		}
 	}
 }
