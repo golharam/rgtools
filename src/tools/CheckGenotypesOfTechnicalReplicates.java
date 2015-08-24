@@ -1,7 +1,11 @@
 package tools;
 
+import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.IOUtil;
 import htsjdk.samtools.util.Log;
+import htsjdk.variant.variantcontext.Genotype;
+import htsjdk.variant.variantcontext.GenotypesContext;
+import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 
 import java.io.BufferedReader;
@@ -10,7 +14,10 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Set;
 
 import picard.cmdline.CommandLineProgram;
 import picard.cmdline.Option;
@@ -37,17 +44,19 @@ public class CheckGenotypesOfTechnicalReplicates extends CommandLineProgram {
     	new CheckGenotypesOfTechnicalReplicates().instanceMainWithExit(args);
     }
     
-    private HashMap<String,String> readSamples(File sampleReplicateInfo) {
-    	HashMap<String,String> repToSampleMap = new HashMap<String,String>();
+    private HashMap<String,String[]> readSampleReplicatesMap(File sampleReplicateInfo) {
+    	HashMap<String,String[]> sampleToReplicates = new HashMap<String,String[]>();
 		try {
 	    	String line;
 	    	BufferedReader in;
 			in = new BufferedReader(new InputStreamReader(new FileInputStream(sampleReplicateInfo)));
 		    	
 	        while ((line = in.readLine()) != null) {
-	            final String[] fields = line.split("\t");
-	            log.debug(fields[1] + " -> " + fields[0]);
-	            repToSampleMap.put(fields[1], fields[0]);
+	            String[] fields = line.split("\t");
+	            String sample = fields[0];   
+	            String[] replicates = fields[1].split(",");
+	            
+	            sampleToReplicates.put(sample, replicates);
 	        }
 	        
 	        in.close();
@@ -57,7 +66,7 @@ public class CheckGenotypesOfTechnicalReplicates extends CommandLineProgram {
 			e.printStackTrace();
 		}
 
-    	return repToSampleMap;
+    	return sampleToReplicates;
     }
     
 	@Override
@@ -67,9 +76,35 @@ public class CheckGenotypesOfTechnicalReplicates extends CommandLineProgram {
 		IOUtil.assertFileIsReadable(VCF);
 		IOUtil.assertFileIsReadable(REPLICATES);
 
-		HashMap samples = readSamples(REPLICATES);
+		HashMap<String,String[]> sampleToReplicates = readSampleReplicatesMap(REPLICATES);
 		
-		//VCFFileReader vcfFileReader = new VCFFileReader(VCF, false);
+		VCFFileReader vcfFileReader = new VCFFileReader(VCF, false);
+		CloseableIterator<VariantContext> variantIterator = vcfFileReader.iterator();
+		while (variantIterator.hasNext()) {
+			VariantContext vc = variantIterator.next();
+			
+			// for each sample...
+			for (String sample : sampleToReplicates.keySet()) {
+				// get the genotypes for each of the replicates for this sample
+				String[] replicates = sampleToReplicates.get(sample);
+				Genotype[] genotypes = new Genotype[replicates.length];
+				int i = 0;
+				for (String replicate : replicates) {
+					genotypes[i] = vc.getGenotype(replicate);
+					// if this isn't the first replicate, make sure all the genotypes for the technical replicates 
+					// agree with each other
+					if (i > 0) {
+						if (!genotypes[i].getGenotypeString().equals(genotypes[0].getGenotypeString())) {
+							String msg = String.format("Genotype for replicate %s (%s) does not match first replicate %s (%s) for variant at %s:%d", replicate, genotypes[i].getGenotypeString(), replicates[0], genotypes[0].getGenotypeString(), vc.getChr(), vc.getStart());
+							log.warn(msg);
+						}
+					}
+					i++;
+				}
+				
+			}
+		}
+		vcfFileReader.close();
 		return 0;
 	}
 

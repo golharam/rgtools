@@ -16,6 +16,8 @@ Algorithm:
 import argparse
 from string import split
 from common import display
+import ConfigParser
+import os
 
 api_url = ''
 api_key = ''
@@ -66,12 +68,22 @@ def main():
 	    
 
 if __name__ == '__main__':
+    # Get defaults from ~/.galaxy.ini
+    config = ConfigParser.RawConfigParser()
+    if os.path.exists(os.path.expanduser("~/.galaxy.ini")):
+        config.read(os.path.expanduser("~/.galaxy.ini"))
+        api_key = config.get('default', 'api_key')
+        api_url = config.get('default', 'api_url')
+    else:
+        api_key = None
+        api_url = None
+
+    # Get library to create and override defaults with options specified on command lne
     parser = argparse.ArgumentParser()
-    parser.add_argument("api_key", help="API KEY")
-    parser.add_argument('api_url', help='API URL')
-    parser.add_argument('debug', help="Print Debug Statement (boolean)")
+    parser.add_argument('--api-url', help="Galaxy URL", default=api_url)
+    parser.add_argument('--api-key', help="User's Galaxy Key", default=api_key)
     args = parser.parse_args()
-    _debug = int(args.debug)
+
     api_key = args.api_key
     api_url = args.api_url
     main()

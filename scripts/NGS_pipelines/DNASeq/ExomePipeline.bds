@@ -637,6 +637,15 @@ task ( "$analysisDir/VCF/cohort_recalibrated_variants.vcf" <- ["$analysisDir/int
 		-o $analysisDir/VCF/cohort_recalibrated_variants.vcf
 }
 
+task ( "$analysisDir/VCF/cohort_recalibrated_variants.eval.txt" <- "$analysisDir/VCF/cohort_recalibrated_variants.vcf", taskName:="VariantEvaluation") {
+	sys $javaApp -Xmx64G -jar $gatkJar \
+        	-T VariantEval \
+                -R $reference \
+		--eval $analysisDir/VCF/cohort_recalibrated_variants.vcf \
+                -o $analysisDir/VCF/cohort_recalibrated_variants.eval.txt
+
+}
+
 task ( "$analysisDir/intermediate/cohort_recalibrated_variants.snpEff.vcf" <- "$analysisDir/VCF/cohort_recalibrated_variants.vcf", taskName:="SnpEff" ) {
 	sys $javaApp -jar $snpEffJar -c /ngs/ngs15/golharr/apps/SnpEff-4.1a-2015-01-14/snpEff.config -v -o gatk hg19 \
 		$analysisDir/VCF/cohort_recalibrated_variants.vcf > $analysisDir/intermediate/cohort_recalibrated_variants.snpEff.vcf

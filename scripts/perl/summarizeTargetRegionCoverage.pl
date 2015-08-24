@@ -48,8 +48,9 @@ for my $s (@ORDERED_SAMPLES) {
 	        while ($lineIndex < scalar(@lines)) {
         	        my @fields = split(/\t/, $lines[$lineIndex]);
                 	# This field may not always be defined
-			#my $target = $fields[0];
-                	my $target = $fields[1]."_".$fields[2]."_".$fields[3];
+			my $target = $fields[0];
+                	#my $target = $fields[1]."_".$fields[2]."_".$fields[3];
+
 	                push @ORDERED_TARGETS, $target;
         	        $TARGETS{$target}{'Chromosome'} = $fields[1];
                 	$TARGETS{$target}{'Start'} = $fields[2];
@@ -65,8 +66,8 @@ for my $s (@ORDERED_SAMPLES) {
 	my $targetIndex = 0;
 	while ($lineIndex < scalar(@lines)) {
 		my @fields = split(/\t/, $lines[$lineIndex]);
-		#my $target = $fields[0];
-		my $target = $fields[1]."_".$fields[2]."_".$fields[3];
+		my $target = $fields[0];
+		#my $target = $fields[1]."_".$fields[2]."_".$fields[3];
 
 		# make sure target matches our list
 		if ($target ne $ORDERED_TARGETS[$targetIndex]) {

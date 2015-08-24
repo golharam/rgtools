@@ -4,7 +4,7 @@ use strict;
 my %SAMPLES;
 
 # 1.  Read list of samples
-open(IN, "<samples.txt") || die "Unable to open samples.txt\n";
+open(IN, "<$ARGV[0]") || die "Unable to open $ARGV[0]\n";
 while (<IN>) {
 	chomp;
 	my ($sample) = split(/\t/);
@@ -35,19 +35,23 @@ sub getSampleDedupMetrics {
 sub printSummary {
 	my @fields;
 
+	# Get the first sample to get a list of fields
+        for my $sample (sort keys %SAMPLES) {
+                @fields = sort keys $SAMPLES{$sample};
+        }
+	
 	# Print the header
-	for my $sample (sort keys %SAMPLES) {
-		print "\t$sample";
-		@fields = sort keys $SAMPLES{$sample};
-	}
-	print "\n";
+        for my $field (@fields) {
+                print "\t$field";
+        }
+        print "\n";
 
-	for my $field (@fields) {
-		print "$field";
-		for my $sample (sort keys %SAMPLES) {
-			print "\t".$SAMPLES{$sample}{$field};
-		}
-		print "\n";
-	}
-	print "\n";
+        for my $sample (sort keys %SAMPLES) {
+                print "$sample";
+                for my $field (@fields) {
+                        print "\t".$SAMPLES{$sample}{$field};
+                }
+                print "\n";
+        }
+        print "\n";
 }

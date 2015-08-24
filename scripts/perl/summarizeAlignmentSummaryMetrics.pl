@@ -2,9 +2,10 @@
 use strict;
 
 my %SAMPLES;
+my @FIELDS;
 
 # 1.  Read list of samples
-open(IN, "<samples.txt") || die "Unable to open samples.txt\n";
+open(IN, "<$ARGV[0]") || die "Unable to open $ARGV[0]\n";
 while (<IN>) {
 	chomp;
 	my ($sample) = split(/\t/);
@@ -23,31 +24,44 @@ sub getSampleAlignmentMetrics {
 	close(ALN);
 	chomp @metrics;
 
-	my @fields = split(/\t/, $metrics[6]);
-	my @values = split(/\t/, $metrics[12]);
+	my $i = 0;
+	while ($i < scalar(@metrics)) {
+		if ($metrics[$i] =~ m/^CATEGORY/) {
+			@FIELDS = split(/\t/, $metrics[$i]);
+		}
+		$i++;
+	}
 
-	for (my $i = 0; $i < (scalar(@fields)); $i++) {
-		$SAMPLES{$sample}{$fields[$i]} = $values[$i];
+	my @values;
+	$i = scalar(@metrics) - 1;
+	while ($i >= 0) {
+		if (length($metrics[$i]) > 0) {
+			@values = split(/\t/, $metrics[$i]);
+			$i = -1;
+		}
+		$i--;
+	}
+
+	for (my $i = 0; $i < (scalar(@FIELDS)); $i++) {
+		$SAMPLES{$sample}{$FIELDS[$i]} = $values[$i];
 	}
 
 }
 
 sub printSummary {
-	my @fields;
 
 	# Print the header
-	for my $sample (sort keys %SAMPLES) {
-		print "\t$sample";
-		@fields = sort keys $SAMPLES{$sample};
-	}
-	print "\n";
+        for my $field (@FIELDS) {
+                print "\t$field";
+        }
+        print "\n";
 
-	for my $field (@fields) {
-		print "$field";
-		for my $sample (sort keys %SAMPLES) {
-			print "\t".$SAMPLES{$sample}{$field};
-		}
-		print "\n";
-	}
-	print "\n";
+        for my $sample (sort keys %SAMPLES) {
+                print "$sample";
+                for my $field (@FIELDS) {
+                        print "\t".$SAMPLES{$sample}{$field};
+                }
+                print "\n";
+        }
+        print "\n";
 }

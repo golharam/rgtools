@@ -26,7 +26,7 @@ import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMFileReader.ValidationStringency;
 
 public class CountMappedReadPairs extends CommandLineProgram {
-	private static String VERSION = "0.1";
+	private static String VERSION = "0.2";
 
 	private static final Log log = Log.getInstance(CountMappedReadPairs.class);
 
@@ -49,11 +49,12 @@ public class CountMappedReadPairs extends CommandLineProgram {
 		
         IOUtil.assertFileIsReadable(INPUT);
         IOUtil.assertFileIsWritable(OUT);
-        
+
         // Make sure sort order of input BAM file is by read name
         SAMFileReader inputSam = new SAMFileReader(INPUT);
         final net.sf.samtools.SAMFileHeader fileHeader = inputSam.getFileHeader();
         final SortOrder inputSortOrder = fileHeader.getSortOrder();
+
         if (inputSortOrder != SortOrder.queryname) {
             log.error("Input BAM file must be sorted by query name");
             inputSam.close();
@@ -61,12 +62,12 @@ public class CountMappedReadPairs extends CommandLineProgram {
         }
         
         // Count the read pairs
-        int count = 1;
+        inputSam.setValidationStringency(ValidationStringency.LENIENT);
+        int count = 0;
         int readPairs = 0, unmappedReadPairs = 0, mappedReadPairs = 0, unPairedReads = 0;
         SAMRecord first = null, second = null;
         boolean isFirstMapped, isSecondMapped;
 
-               
         for (SAMRecord read : inputSam) {
             // only want 1 count per read so skip non primary alignments
         	if (read.isSecondaryOrSupplementary())
@@ -74,8 +75,14 @@ public class CountMappedReadPairs extends CommandLineProgram {
         	
             if (read.getReadPairedFlag()) {
                 if (read.getFirstOfPairFlag()) {
-                	first = read;
+                	if (first != null)
+                		log.warn("Read already encountered: " + read.getReadName());
+
+               		first = read;
                 } else {
+                	if (second != null)
+                		log.warn("Read already encountered: " + read.getReadName());
+
                 	second = read;
                 }
                 
@@ -88,7 +95,7 @@ public class CountMappedReadPairs extends CommandLineProgram {
                 		
                 		if (isFirstMapped && isSecondMapped) {
                 			if ((first.getMateUnmappedFlag() == true) || (second.getMateUnmappedFlag() == true)) {
-                				log.warn("Mate information not correct");
+                				log.warn("Mate information not correct for " + first.getReadName());
                 			}
 
                 			mappedReadPairs++;
@@ -99,7 +106,7 @@ public class CountMappedReadPairs extends CommandLineProgram {
                 		first = null;
                 		second = null;
                 	} else {
-                		log.error("Read names don't match");
+                		log.error("Read names don't match: " + first.getReadName() + " and " + second.getReadName());
                 		inputSam.close();
                 		return -1;
                 	}

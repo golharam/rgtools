@@ -542,12 +542,16 @@ public class VCFBrowser extends JFrame {
 					igv_out.close();
 					//igv_in.close();
 					igv_socket.close();
-				}				
+				} else {
+					log.warn("Unable to connect to IGV");
+					return;
+				}
 			} catch (UnknownHostException e1) {
-				log.error("Unable to connect to IGV");
+				log.error("Unable to connect to IGV, 127.0.0.1 is unknown host.");
 				return;
 			} catch (IOException e1) {
-				log.error("Unable to connect to IGV");
+				log.error("Unable to connect to IGV, IOException");
+				e1.printStackTrace();
 				return;
 			}
 		}

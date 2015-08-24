@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+use strict;
 
 # Copyright (c) 2011 Erik Aronesty (erik@q32.com)
 # 
@@ -28,12 +29,18 @@ use Getopt::Long;
 my $extended;
 GetOptions("x"=>\$extended);
 
-$in = shift @ARGV;
+my $in = shift @ARGV;
 
 my $in_cmd =($in =~ /\.gz$/ ? "gunzip -c $in|" : $in =~ /\.zip$/ ? "unzip -p $in|" : "$in") || die "Can't open $in: $!\n";
 open IN, $in_cmd;
 
+my %exons;	# hash of arrays keyed by transcript id
+my %sc;		# start-stop codons
+my %trans;	# hash of just the first exon encountered for each transcript
 while (<IN>) {
+	my $gff;
+	my $id;
+
 	$gff = 2 if /^##gff-version 2/;
 	$gff = 3 if /^##gff-version 3/;
 	next if /^#/ && $gff;
@@ -69,56 +76,60 @@ while (<IN>) {
 		push @{$exons{$id}}, \@f;
 	}
 }
+close IN;
 
-for $id ( 
+for my $id (
 	# sort by chr then pos
 	sort {
 		$trans{$a}->[0] eq $trans{$b}->[0] ? 
 		$trans{$a}->[3] <=> $trans{$b}->[3] : 
 		$trans{$a}->[0] cmp $trans{$b}->[0]
 	} (keys(%trans)) ) {
-		my ($chr, undef, undef, undef, undef, undef, $dir, undef, $attr, undef, $cds, $cde) = @{$trans{$id}};
-        my ($cds, $cde);
-        ($cds, $cde) = @{$sc{$id}} if $sc{$id};
 
-		# sort by pos
-		my @ex = sort {
-			$a->[3] <=> $b->[3]
-		} @{$exons{$id}};
+	my ($chr, undef, undef, undef, undef, undef, $dir, undef, $attr, undef, $cds, $cde) = @{$trans{$id}};
+	#my ($cds, $cde) = @{$sc{$id}} if $sc{$id};
 
-		my $beg = $ex[0][3];
-		my $end = $ex[-1][4];
-		
-		if ($dir eq '-') {
-			# swap
-			$tmp=$cds;
-			$cds=$cde;
-			$cde=$tmp;
-			$cds -= 2 if $cds;
-			$cde += 2 if $cde;
-		}
+	# sort by pos
+	my @ex = sort { $a->[3] <=> $b->[3] } @{$exons{$id}};
 
-		# not specified, just use exons
-		$cds = $beg if !$cds;
-		$cde = $end if !$cde;
+	my $beg = $ex[0][3];
+	my $end = $ex[-1][4];
 
-		# adjust start for bed
-		--$beg; --$cds;
-	
-		my $exn = @ex;								# exon count
-		my $exst = join ",", map {$_->[3]-$beg-1} @ex;				# exon start
-		my $exsz = join ",", map {$_->[4]-$_->[3]+1} @ex;			# exon size
+	#if ($dir eq '-') {
+		# swap
+	#	my $tmp=$cds;
+	#	$cds=$cde;
+	#	$cde=$tmp;
+	#	$cds -= 2 if $cds;
+	#	$cde += 2 if $cde;
+	#}
 
-        my $gene_id;
-        my $extend = "";
-        if ($extended) {
-    	    ($gene_id) = $attr =~ /gene_name "([^"]+)"/;
-    	    ($gene_id) = $attr =~ /gene_id "([^"]+)"/ unless $gene_id;
-            $extend="\t$gene_id";
-        }
-		# added an extra comma to make it look exactly like ucsc's beds
-		print "$chr\t$beg\t$end\t$id\t0\t$dir\t$cds\t$cde\t0\t$exn\t$exsz,\t$exst,$extend\n";
+	# not specified, just use exons
+	#$cds = $beg if !$cds;
+	#$cde = $end if !$cde;
+
+	# adjust start for bed
+	--$beg; 
+	#--$cds;
+
+	print "$chr\t$beg\t$end\t$id\t0\t$dir\n";
+
+	#my $exn = @ex;								# exon count
+	#my $exst = join ",", map {$_->[3]-$beg-1} @ex;				# exon start
+	#my $exsz = join ",", map {$_->[4]-$_->[3]+1} @ex;			# exon size
+
+	#my $gene_id;
+	#my $extend = "";
+	#if ($extended) {
+	#	($gene_id) = $attr =~ /gene_name "([^"]+)"/;
+	#	($gene_id) = $attr =~ /gene_id "([^"]+)"/ unless $gene_id;
+	#	$extend="\t$gene_id";
+	#}
+
+	# added an extra comma to make it look exactly like ucsc's beds
+	#print "$chr\t$beg\t$end\t$id\t0\t$dir\t$cds\t$cde\t0\t$exn\t$exsz,\t$exst,$extend\n";
 }
 
 
-close IN;
+
+

@@ -6,5 +6,6 @@
 	<classpathentry kind="lib" path="lib/picard-1.121.jar"/>
 	<classpathentry kind="lib" path="lib/htsjdk-1.121.jar"/>
 	<classpathentry kind="lib" path="lib/snpEff.jar"/>
+	<classpathentry kind="lib" path="lib/commons-lang3-3.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

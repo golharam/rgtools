@@ -4,7 +4,7 @@ use strict;
 my %SAMPLES;
 
 # 1.  Read list of samples
-open(IN, "<samples.txt") || die "Unable to open samples.txt\n";
+open(IN, "<$ARGV[0]") || die "Unable to open $ARGV[0]\n";
 while (<IN>) {
 	chomp;
 	my ($sample) = split(/\t/);
@@ -29,32 +29,37 @@ sub getSampleFastqValidatorMetrics {
 	$metrics[2] =~ m/Returning: \d+ : (\w+)/;
 	$SAMPLES{$sample}{'fq1_status'} = $1;
 
-        open(F, "<analysis/qaqc/$sample.fq2.fastqValidator.txt") || die "Unable to open analysis/qaqc/$sample.fq2.fastqValidator.txt\n";
-        my @metrics = <F>;
-        close(F);
-        chomp @metrics;
+	if (-e "analysis/qaqc/$sample.fq2.fastqValidator.txt") {
+	        open(F, "<analysis/qaqc/$sample.fq2.fastqValidator.txt") || die "Unable to open analysis/qaqc/$sample.fq2.fastqValidator.txt\n";
+	        my @metrics = <F>;
+        	close(F);
+        	chomp @metrics;
 
-        $metrics[0] =~ m/with \d+ lines containing (\d+) sequences/;
-        $SAMPLES{$sample}{'fq2_sequences'} = $1;
+        	$metrics[0] =~ m/with \d+ lines containing (\d+) sequences/;
+        	$SAMPLES{$sample}{'fq2_sequences'} = $1;
 
-        $metrics[2] =~ m/Returning: \d+ : (\w+)/;
-        $SAMPLES{$sample}{'fq2_status'} = $1;
-
+        	$metrics[2] =~ m/Returning: \d+ : (\w+)/;
+        	$SAMPLES{$sample}{'fq2_status'} = $1;
+	}
 }
 
 sub printSummary {
 	my @fields;
 
-	# Print the header
+	# Get the first sample to get a list of fields
 	for my $sample (sort keys %SAMPLES) {
-		print "\t$sample";
 		@fields = sort keys $SAMPLES{$sample};
+	}
+
+	# Print the header
+	for my $field (@fields) {
+		print "\t$field";
 	}
 	print "\n";
 
-	for my $field (@fields) {
-		print "$field";
-		for my $sample (sort keys %SAMPLES) {
+	for my $sample (sort keys %SAMPLES) {
+		print "$sample";
+		for my $field (@fields) {
 			print "\t".$SAMPLES{$sample}{$field};
 		}
 		print "\n";

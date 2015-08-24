@@ -38,6 +38,6 @@ for my $gzfile (`cat allsamples.txt`) {
 	}
 }
 
-for my $sample (keys %SAMPLES) {
+for my $sample (sort keys %SAMPLES) {
 	print join("\t", $sample, $SAMPLES{$sample}{'fq1'}, $SAMPLES{$sample}{'fq2'}), "\n";
 }
