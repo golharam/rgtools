@@ -325,12 +325,12 @@ then
 
 	mkdir contamination
 	cd contamination
-	$BOWTIE2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
-		 --al-conc-gz $SAMPLE.contaminated.fastq.gz \
-		 -p $THREADS -1 ${SAMPLE}_1.fastq -2 ${SAMPLE}_2.fastq \
+	$BOWTIE2 --no-mixed --un-conc $SAMPLE.uncontaminated.fastq \
+		 --al-conc $SAMPLE.contaminated.fastq \
+		 -p $THREADS -1 ../${SAMPLE}_1.fastq -2 ../${SAMPLE}_2.fastq \
 		 --no-unal --rg-id $SAMPLE \
 		 --rg 'SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina' \
-		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE
+		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE 2> $SAMPLE.contamination.log
 
 	if [ $? -ne 0 ]; then
 		echo "Error running bowtie2 for contamination"
@@ -339,14 +339,13 @@ then
 		exit -1
 	fi
 	
+	mv ${SAMPLE}.uncontaminated.1.fastq ../${SAMPLE}_1.fastq
+	mv ${SAMPLE}.uncontaminated.2.fastq ../${SAMPLE}_2.fastq 
 	cd ..
-	#${SAMPLE}_1.fastq =
-	#${SAMPLE}_2.fastq =
-
+	
 	echo "Finished checking for bacterial/viral contamination"
 	date '+%m/%d/%y %H:%M:%S'
 	echo
-	exit 0
 fi
 
 ##############################################################################
