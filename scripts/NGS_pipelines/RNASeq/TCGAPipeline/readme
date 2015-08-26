@@ -2,9 +2,9 @@ This is the TCGA UNC RNA-Seq v2 pipeline.
 
 makeSampleSheet.pl          - Constructs a sample sheet used as input to the rest of the pipeline. Output is a 3 column text file.
 runTCGAPipeline.pl          - Runs the UNC pipeline on all the samples specified in the sample sheet.  
-				This script will also download the sample files as necessary (AWS S3, SRA FTP)
 				This script uses the following files:
 - unc_rnaseqV2_pipeline.v2.sh - Actual pipeline (per sample)
+				This script will also download the fastq files from their original location if they are not local.
 - abundance_estimates_to_matrix.pl - Merges the samples into count matrices
 - TCGAQuartileNormalizationUNC.pl - Produces upper quartile normalized matrices
 

@@ -1,9 +1,6 @@
 package cmdline;
 
-import htsjdk.samtools.util.Log;
-
 /**
- * 
  * This is the main class of rgtools and is the way of executing individual command line programs.
  *
  * CommandLinePrograms are listed in a single command line interface based on the java package specified to instanceMain.
@@ -13,10 +10,8 @@ import htsjdk.samtools.util.Log;
  *
  */
 public class rgtoolsCommandLine {
-    private static final Log log = Log.getInstance(rgtoolsCommandLine.class);
 
-	public static void main(String[] args) {
-
-	}
+    public static void main(final String[] args) {
+    }
 
 }

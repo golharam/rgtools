@@ -98,14 +98,18 @@ fi
 if [ $AWS == 0 ]; then
 	EXT_PKGS_DIR=/apps/sys/galaxy/external_packages
 	REFERENCE_DIR=/ngs/ngs15/golharr/NGS/mRNAseq_TCGA/hg19_M_rCRS
+	CONTAMINATION_REFERENCE=/ng18/galaxy/reference_genomes/contamination/bowtie2_index/contamination
 	TMP_DIR=/scratch
 else
 	EXT_PKGS_DIR=/ngs/apps
 	REFERENCE_DIR=/ngs/reference/mRNAseq_TCGA/hg19_M_rCRS
+	CONTAMINATION_REFERENCE=/ngs/reference/contamination/bowtie2_index/contamination
 	TMP_DIR=/scratch
 fi
 
+# Applications / Programs
 BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
+BOWTIE2=$EXT_PKGS_DIR/bowtie2-2.2.6/bowtie2
 FASTQC=$EXT_PKGS_DIR/FastQC-0.11.2/fastqc
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
 #MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multi_threads_2.0.1.9/bin
@@ -121,6 +125,8 @@ UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
 
 # Start Analysis
 echo "Processing $SAMPLE"
+echo "FastQ1: $FASTQ1"
+echo "FastQ2: $FASTQ2"
 date '+%m/%d/%y %H:%M:%S'
 echo
 
@@ -137,7 +143,11 @@ echo "Output dir is $OUTDIR"
 date '+%m/%d/%y %H:%M:%S'
 echo
 
+##############################################################################
+# Step 1: Download the file to the local scratch space
 # If SRA, download from SRA
+# If FTP, download from FTP
+##############################################################################
 if [ -n "$SRAFTP" ]
 then
 	if [ ! -e ${SAMPLE}.sra ]
@@ -192,6 +202,40 @@ then
 		FASTQ2=${SAMPLE}_2.fastq.gz
 	fi
 fi
+# If FTP location, then download from FTP
+if [[ $FASTQ1 == ftp* ]]
+then
+	echo "Downloading $FASTQ1"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	FILENAME=`basename $FASTQ1`
+	wget -nv $FASTQ1
+	
+	if [ $? -ne 0 ]
+	then
+	        echo "Error downloading $FASTQ1"
+	        rm -f $FASTQ1 2>/dev/null
+        	exit -1
+	fi
+	FASTQ1=$FILENAME
+
+	# Repeat for FastQ2
+	echo "Downloading $FASTQ2"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
+        FILENAME=`basename $FASTQ2`
+        wget -nv $FASTQ2
+
+        if [ $? -ne 0 ]
+        then
+                echo "Error downloading $FASTQ2"
+                rm -f $FASTQ2 2>/dev/null
+                exit -1
+        fi
+        FASTQ2=$FILENAME
+fi
 
 echo FASTQ1: $FASTQ1
 if [ -n "$FASTQ2" ]
@@ -202,52 +246,9 @@ date '+%m/%d/%y %H:%M:%S'
 analysis_date_started=$(date +"%s")
 echo
 
-# 0a. Download from kraken
-if [ $AWS == 1 ]
-then
-	echo "Running on AWS"
-	BASEFQ1=`basename $FASTQ1`
-	BASEFQ2=`basename $FASTQ2`
-	if [ ! -e $BASEFQ1 ]
-	then
-		echo "Downloading $BASEFQ1"
-		date '+%m/%d/%y %H:%M:%S'
-		echo
-
-		#S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ1 | cut -d ' ' -f 4`
-		#S3LOC="s3://bmsrd-ngs/$S3LOC"
-		#echo aws s3 cp $S3LOC .
-		#aws s3 cp $S3LOC .
-		scp -q golharr@kraken.pri.bms.com:$FASTQ1 .
-
-		if [ $? -ne 0 ]; then
-			echo Error downloading $BASEFQ1
-			exit -1
-		fi
-	fi
-
-	if [ ! -e $BASEFQ2 ]
-	then
-		echo
-		echo "Downloading $BASEFQ2"
-		date '+%m/%d/%y %H:%M:%S'
-		echo
-
-		#S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ2 | cut -d ' ' -f 4`
-		#S3LOC="s3://bmsrd-ngs/$S3LOC"
-		#echo aws s3 cp $S3LOC .
-		#aws s3 cp $S3LOC .
-		scp -q golharr@kraken.pri.bms.com:$FASTQ2 .
-
-		if [ $? -ne 0 ]; then
-			echo Error downloading $BASEFQ2
-		fi
-	fi
-	FASTQ1=$BASEFQ1
-	FASTQ2=$BASEFQ2
-fi
-
-# 0b. Unzip the fastqs
+##############################################################################
+# Step 2: Unzip the FASTQs
+##############################################################################
 if [ ! -e ${SAMPLE}_1.fastq ]; then
 
 	FILETYPE=`file $FASTQ1 | cut -f 2 -d ' '`
@@ -294,7 +295,9 @@ if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
 	fi
 fi
 
-# Run FastQC
+##############################################################################
+# Step 3: Run FastQC
+##############################################################################
 if [ "$RUN_FASTQC" -eq 1 ] 
 then
 	echo "Running FastQC"
@@ -311,7 +314,44 @@ then
 	echo
 fi
 
-# 1. Format fastq 1 for Mapsplice
+##############################################################################
+# Step 4: Perform contamination detection
+##############################################################################
+if [ ! -d contamination ]
+then
+	echo "Checking for bacterial/viral contamination"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	mkdir contamination
+	cd contamination
+	$BOWTIE2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
+		 --al-conc-gz $SAMPLE.contaminated.fastq.gz \
+		 -p $THREADS -1 ${SAMPLE}_1.fastq -2 ${SAMPLE}_2.fastq \
+		 --no-unal --rg-id $SAMPLE \
+		 --rg 'SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina' \
+		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE
+
+	if [ $? -ne 0 ]; then
+		echo "Error running bowtie2 for contamination"
+		cd ..
+		rm -rf contamination
+		exit -1
+	fi
+	
+	cd ..
+	#${SAMPLE}_1.fastq =
+	#${SAMPLE}_2.fastq =
+
+	echo "Finished checking for bacterial/viral contamination"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+	exit 0
+fi
+
+##############################################################################
+# Step 5: Format FastQs for Mapsplice
+##############################################################################
 if [ ! -e prep_1.fastq ]
 then
 	echo "Prepping prep_1.fastq"
@@ -330,7 +370,6 @@ then
 	touch ${SAMPLE}_1.fastq
 fi
 
-# 2. Format fastq 2 for Mapsplice
 if [ -n "$FASTQ2" ] && [ ! -e prep_2.fastq ] 
 then
 	echo
@@ -350,10 +389,11 @@ then
 	touch ${SAMPLE}_2.fastq
 fi
 
-# 3. Mapsplice
+##############################################################################
+# Step 6: Run Mapsplice
+##############################################################################
 if [ ! -e $SAMPLE.mapsplice/alignments.bam ]
 then
-
 	## example command. this is for Mapsplice 12_07 though, i'm modifying it for Mapsplice 2.0.1.9, which they used in more recent samples.
 	#python mapsplice_multi_thread.py --fusion --all-chromosomes-files hg19_M_rCRS/hg19_M_rCRS.fa --pairend -X 8 -Q fq --chromosome-filesdir hg19_M_rCRS/chromosomes --Bowtieidx hg19_M_rCRS/ebwt/humanchridx_M_rCRS -1 working/prep_1.fastq -2 working/prep_2.fastq -o SAMPLE_BARCODE 2> working/mapsplice.log
 	## actual command
@@ -395,7 +435,9 @@ then
 	fi
 fi
 
-# 4. Add read groups
+##############################################################################
+# Step 7: Add Read Groups to BAM File
+##############################################################################
 if [ ! -e $SAMPLE.rg.alignments.bam ]
 then
 	echo
@@ -418,7 +460,10 @@ fi
 # 5. Convert back to phred33
 # java -Xmx512M -jar ubu.jar sam-convert --phred64to33 --in working/rg_alignments.bam .out working/phred33_alignments.bam > working/sam_convert.log 2> working/sam_convert.log
 
-# 6. Sort by coordinate (I think this step can be combined with adding read groups)
+##############################################################################
+# Step 8: Sort by coordinate
+# This step is performed when adding read groups. We simply do a symlink here.
+##############################################################################
 if [ ! -e $SAMPLE.genome.aln.bam ]
 then
 	ln -s $SAMPLE.rg.alignments.bam $SAMPLE.genome.aln.bam
@@ -430,7 +475,9 @@ then
 #	java -Xmx8g -jar -Djava.io.tmpdir=. $PICARD_JAR SortSam I=${SAMPLE}.rg.alignments.bam O=${SAMPLE}.genome.aln.bam SO=coordinate CREATE_INDEX=true VALIDATION_STRINGENCY=SILENT
 fi
 
-# 7. Flagstat
+##############################################################################
+# Step 9: Flagstat
+##############################################################################
 if [ ! -e ${SAMPLE}.genome.aln.bam.flagstat ]
 then
 	echo
@@ -445,7 +492,10 @@ fi
 ## don't need to do this because I've already indexed it with picard.
 # samtools index ${SAMPLE}.genome.aln.bam
 
-# 9. Sort by chromosome, then read id
+##############################################################################
+# Step 10: Sort by chromosome, then read id
+# Do we really need this?
+##############################################################################
 if [ ! -e ${SAMPLE}.alignments.chromReadSorted.bam ]
 then
 	echo
@@ -456,7 +506,10 @@ then
 	time perl $UBU_DIR/src/perl/sort_bam_by_reference_and_name.pl --input ${SAMPLE}.genome.aln.bam --output ${SAMPLE}.alignments.chromReadSorted.bam --temp-dir $TMP_DIR --samtools $SAMTOOLS
 fi
 
-# 10. Translate to transcriptome coords
+##############################################################################
+# Step 11: Translate to transcriptome coords
+# This can go away if we use a different mapper, I think
+##############################################################################
 if [ ! -e ${SAMPLE}.transcriptome.aln.bam ]
 then
 	echo
@@ -467,8 +520,9 @@ then
 	time java -Xms8g -Xmx8g -jar $UBU_JAR sam-xlate --bed $REFERENCE_DIR/../unc_hg19.bed --in ${SAMPLE}.alignments.chromReadSorted.bam --out ${SAMPLE}.transcriptome.aln.bam --order $REFERENCE_DIR/rsem_ref/hg19_M_rCRS_ref.transcripts.fa --xgtags --reverse
 fi
 
-
-# 11. Filter indels, large inserts, zero mapping quality from transcriptome bam
+##############################################################################
+# Step 12: Filter indels, large inserts, zero mapping quality from transcriptome bam
+##############################################################################
 if [ ! -e ${SAMPLE}.transcriptome.aln.filtered.bam ]
 then
 	echo
@@ -479,7 +533,10 @@ then
 	time java -Xmx1g -jar $UBU_JAR sam-filter --in ${SAMPLE}.transcriptome.aln.bam --out ${SAMPLE}.transcriptome.aln.filtered.bam --strip-indels --max-insert 10000 --mapq 1
 fi
 
-# Strip read names of /1 and /2 
+##############################################################################
+# Step 13: Strip read names of /1 and /2
+# Depending on the version of RSEM and Mapsplice, this may not be needed.
+##############################################################################
 if [ ! -e ${SAMPLE}.transcriptome.aln.filtered.stripped.bam ]
 then
 	echo
@@ -490,7 +547,9 @@ then
 	java -jar $RGTOOLS_DIR/StripPairInfoFromReadName.jar I=${SAMPLE}.transcriptome.aln.filtered.bam O=${SAMPLE}.transcriptome.aln.filtered.stripped.bam S="/1" S="/2"
 fi
 
-# 12. RSEM
+##############################################################################
+# Step 14: Run RSEM Calculate Expression
+##############################################################################
 if [ ! -e ${SAMPLE}.rsem.genes.results ]
 then
 	echo
@@ -579,7 +638,10 @@ fi
 #	fi
 #fi
 
-# 19. Cleanup large intermediate output
+##############################################################################
+# Step 15: Cleanup large intermediate output and transfer data to final
+#          resting place
+##############################################################################
 if [ $AWS == 1 ]
 then
 	rm $FASTQ1 $FASTQ2
@@ -604,6 +666,9 @@ else
 	rm -rf $SAMPLE_DIR 2>/dev/null
 fi
 
+##############################################################################
+# Step 16: Complete
+##############################################################################
 echo
 echo $SAMPLE Complete
 date '+%m/%d/%y %H:%M:%S'
