@@ -342,10 +342,6 @@ then
 	mv ${SAMPLE}.uncontaminated.1.fastq ../${SAMPLE}_1.fastq
 	mv ${SAMPLE}.uncontaminated.2.fastq ../${SAMPLE}_2.fastq 
 	cd ..
-	
-	echo "Finished checking for bacterial/viral contamination"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
 fi
 
 ##############################################################################
