@@ -15,7 +15,7 @@ AWS=0
 OUTDIR=`pwd`
 DELETE_INTERMEDIATE=0
 THREADS=8
-REFERENCE=hg19
+REFERENCE=hg19ERCC
 SUBSAMPLE=0
 
 if [ $# -eq 0 ]
@@ -539,4 +539,3 @@ date '+%m/%d/%y %H:%M:%S'
 analysis_date_finished=$(date +"%s")
 diff=$(($analysis_date_finished-$analysis_date_started))
 echo "Total analysis took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
-
