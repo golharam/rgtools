@@ -419,7 +419,6 @@ then
         echo "Runng tophat2 took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
 	echo
 fi
-exit 0
 
 # 5. Re-sort sequenences
 if [ ! -e ${SAMPLE}.bam ]
