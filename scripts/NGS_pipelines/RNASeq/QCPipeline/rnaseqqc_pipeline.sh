@@ -5,10 +5,13 @@
 #$ -j y
 #$ -pe orte 8
 
-# RG Version 0.1
-# 1.  Set default values.  These can be set via command-line options only.  Setting them here overrides environment variables
-AWS=0
+###############################################################################
+# Set default values.  These can be set via command-line options only.  
+# Setting them here overrides environment variables
+###############################################################################
+VERSION=0.1
 HELP=0
+AWS=0
 OUTDIR=`pwd`
 DELETE_INTERMEDIATE=0
 THREADS=8
@@ -22,10 +25,13 @@ then
 	fi
 fi
 
-# 2. Get command line options.
-# Command line arguments and where to download is Ryan Golhar.
-# Use > 1 to consume two arguments per pass in the loop (e.g. each argument has a corresponding value to go with it).
-# Use > 0 to consume one or more arguments per pass in the loop (e.g. some arguments don't have a corresponding value to go with it such as --help).
+###############################################################################
+# Get command line options.
+# a.  Use > 1 to consume two arguments per pass in the loop (e.g. each argument
+#     has a corresponding value to go with it).
+# b.  Use > 0 to consume one or more arguments per pass in the loop (e.g. some
+#     arguments don't have a corresponding value to go with it such as --help).
+###############################################################################
 while [[ $# > 0 ]]
 do
 	key="$1"
@@ -109,7 +115,9 @@ else
 	TMP_DIR=/scratch
 fi
 
+# Applications / Programs
 BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
+BOWTIE2=$EXT_PKGS_DIR/bowtie2-2.2.6/bowtie2
 FASTQC=$EXT_PKGS_DIR/FastQC-0.11.2/fastqc
 FASTQVALIDATOR=$EXT_PKGS_DIR/fastQValidator-0.1.1a/bin/fastQValidator
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
@@ -145,7 +153,11 @@ echo "Output dir is $OUTDIR"
 date '+%m/%d/%y %H:%M:%S'
 echo
 
+##############################################################################
+# Step 1: Download the file to the local scratch space
 # If SRA, download from SRA
+# If FTP, download from FTP
+##############################################################################
 if [ -n "$SRAFTP" ]
 then
 	if [ ! -e ${SAMPLE}.sra ]
@@ -200,6 +212,40 @@ then
 		FASTQ2=${SAMPLE}_2.fastq.gz
 	fi
 fi
+# If FTP location, then download from FTP
+if [[ $FASTQ1 == ftp* ]]
+then
+	echo "Downloading $FASTQ1"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	FILENAME=`basename $FASTQ1`
+	wget -nv $FASTQ1
+	
+	if [ $? -ne 0 ]
+	then
+	        echo "Error downloading $FASTQ1"
+	        rm -f $FASTQ1 2>/dev/null
+        	exit -1
+	fi
+	FASTQ1=$FILENAME
+
+	# Repeat for FastQ2
+	echo "Downloading $FASTQ2"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
+        FILENAME=`basename $FASTQ2`
+        wget -nv $FASTQ2
+
+        if [ $? -ne 0 ]
+        then
+                echo "Error downloading $FASTQ2"
+                rm -f $FASTQ2 2>/dev/null
+                exit -1
+        fi
+        FASTQ2=$FILENAME
+fi
 
 echo FASTQ1: $FASTQ1
 if [ -n "$FASTQ2" ]
@@ -210,52 +256,58 @@ date '+%m/%d/%y %H:%M:%S'
 analysis_date_started=$(date +"%s")
 echo
 
-# 0a. Download from kraken
-if [ $AWS == 1 ]
-then
-	echo "Running on AWS"
-	BASEFQ1=`basename $FASTQ1`
-	BASEFQ2=`basename $FASTQ2`
-	if [ ! -e $BASEFQ1 ]
+##############################################################################
+# Step 2: Unzip the FASTQs
+##############################################################################
+if [ ! -e ${SAMPLE}_1.fastq ]; then
+
+	FILETYPE=`file $FASTQ1 | cut -f 2 -d ' '`
+
+	if [ "$FILETYPE" == "gzip" ]
 	then
-		echo "Downloading $BASEFQ1"
+		echo "Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
 		date '+%m/%d/%y %H:%M:%S'
 		echo
 
-		#S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ1 | cut -d ' ' -f 4`
-		#S3LOC="s3://bmsrd-ngs/$S3LOC"
-		#echo aws s3 cp $S3LOC .
-		#aws s3 cp $S3LOC .
-		scp -q golharr@kraken.pri.bms.com:$FASTQ1 .
-
+		gunzip -dc $FASTQ1 > ${SAMPLE}_1.fastq
+	                                
 		if [ $? -ne 0 ]; then
-			echo Error downloading $BASEFQ1
+			echo "Error Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
+			rm ${SAMPLE}_1.fastq
 			exit -1
 		fi
+	else
+		echo "$FASTQ1 is $FILETYPE.  Not uncompressing"
+		ln -s $FASTQ1 ${SAMPLE}_1.fastq
 	fi
+fi
 
-	if [ ! -e $BASEFQ2 ]
-	then
-		echo
-		echo "Downloading $BASEFQ2"
+if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
+
+	FILETYPE=`file $FASTQ2 | cut -f 2 -d ' '`
+
+        if [ "$FILETYPE" == "gzip" ]
+        then
+	        echo "Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
 		date '+%m/%d/%y %H:%M:%S'
 		echo
 
-		#S3LOC=`aws s3 ls --recursive s3://bmsrd-ngs/ngs/ngs18/ | grep $FQ2 | cut -d ' ' -f 4`
-		#S3LOC="s3://bmsrd-ngs/$S3LOC"
-		#echo aws s3 cp $S3LOC .
-		#aws s3 cp $S3LOC .
-		scp -q golharr@kraken.pri.bms.com:$FASTQ2 .
+	        gunzip -dc $FASTQ2 > ${SAMPLE}_2.fastq
 
-		if [ $? -ne 0 ]; then
-			echo Error downloading $BASEFQ2
+	        if [ $? -ne 0 ]; then
+	                echo "Error Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
+	                rm ${SAMPLE}_2.fastq
+	                exit -1
 		fi
+	else
+		echo "$FASTQ2 is $FILETYPE.  Not uncompressing"
+		ln -s $FASTQ2 ${SAMPLE}_2.fastq
 	fi
-	FASTQ1=$BASEFQ1
-	FASTQ2=$BASEFQ2
 fi
 
-# 1.  Run FastQ Validator
+##############################################################################
+# Step 3: Run FastQ Validator
+##############################################################################
 if [ ! -e $SAMPLE.fq1Validator.txt ]
 then
 	echo "Validating forward reads ($FASTQ1)"
@@ -289,7 +341,9 @@ then
 
 fi
 
-# 2.  Run FastQC
+##############################################################################
+# Step 4: Run FastQC
+##############################################################################
 FASTQC1=`basename $FASTQ1 .fastq.gz`
 if [ ! -e "${FASTQC1}_fastqc.zip" ]
 then
@@ -307,7 +361,39 @@ then
 	fi
 fi
 
-# 3.  Subsample
+##############################################################################
+# Step 5: Perform contamination detection
+##############################################################################
+if [ ! -d contamination ]
+then
+	echo "Checking for bacterial/viral contamination"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	mkdir contamination
+	cd contamination
+	$BOWTIE2 --no-mixed --un-conc $SAMPLE.uncontaminated.fastq \
+		 --al-conc $SAMPLE.contaminated.fastq \
+		 -p $THREADS -1 ../${SAMPLE}_1.fastq -2 ../${SAMPLE}_2.fastq \
+		 --no-unal --rg-id $SAMPLE \
+		 --rg 'SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina' \
+		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE 2> $SAMPLE.contamination.log
+
+	if [ $? -ne 0 ]; then
+		echo "Error running bowtie2 for contamination"
+		cd ..
+		rm -rf contamination
+		exit -1
+	fi
+	
+	mv ${SAMPLE}.uncontaminated.1.fastq ../${SAMPLE}_1.fastq
+	mv ${SAMPLE}.uncontaminated.2.fastq ../${SAMPLE}_2.fastq 
+	cd ..
+fi
+
+##############################################################################
+# Step 6: Subsample
+##############################################################################
 if [ "$SUBSAMPLE" -ne "0" ]; then
 	if [ ! -e ${SAMPLE}_1.fastq ]; then
 		echo "Subsampling for $SUBSAMPLE reads..."

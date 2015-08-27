@@ -10,7 +10,6 @@
 HELP=0
 AWS=0
 OUTDIR=`pwd`
-RUN_FASTQC=1
 DELETE_INTERMEDIATE=0
 THREADS=8
 
@@ -22,17 +21,12 @@ then
 	fi
 fi
 
-# Command line arguments and where to download is Ryan Golhar.
 # Use > 1 to consume two arguments per pass in the loop (e.g. each argument has a corresponding value to go with it).
 # Use > 0 to consume one or more arguments per pass in the loop (e.g. some arguments don't have a corresponding value to go with it such as --help).
 while [[ $# > 0 ]]
 do
 	key="$1"
 	case $key in
-                --fastqc)
-                RUN_FASTQC=1
-		;;
-
 		--delete-intermediate)
 		DELETE_INTERMEDIATE=1
 		;;
@@ -91,7 +85,6 @@ if [ $HELP == 1 ]; then
 	echo "  --delete-intermediate (delete intermediate files, not including source fq.gz) (not yet implemented)"
 	echo "	-h|--help"
 	echo "  -o|--outdir <output directory> [default=current working directory]"
-	echo "  --fastqc (default: do not run fastqc)"
 	exit 0
 fi
 
@@ -110,7 +103,6 @@ fi
 # Applications / Programs
 BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
 BOWTIE2=$EXT_PKGS_DIR/bowtie2-2.2.6/bowtie2
-FASTQC=$EXT_PKGS_DIR/FastQC-0.11.2/fastqc
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
 #MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multi_threads_2.0.1.9/bin
 PICARD_JAR=$EXT_PKGS_DIR/picard-tools-1.129/picard.jar
@@ -293,55 +285,6 @@ if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
 		echo "$FASTQ2 is $FILETYPE.  Not uncompressing"
 		ln -s $FASTQ2 ${SAMPLE}_2.fastq
 	fi
-fi
-
-##############################################################################
-# Step 3: Run FastQC
-##############################################################################
-if [ "$RUN_FASTQC" -eq 1 ] 
-then
-	echo "Running FastQC"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
-
-	if [ -e ${SAMPLE}_2.fastq ]
-	then
-		$FASTQC -t 2 -o . ${SAMPLE}_1.fastq ${SAMPLE}_2.fastq
-	else
-		$FASTQC -o . ${SAMPLE}_1.fastq
-	fi
-
-	echo
-fi
-
-##############################################################################
-# Step 4: Perform contamination detection
-##############################################################################
-if [ ! -d contamination ]
-then
-	echo "Checking for bacterial/viral contamination"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
-
-	mkdir contamination
-	cd contamination
-	$BOWTIE2 --no-mixed --un-conc $SAMPLE.uncontaminated.fastq \
-		 --al-conc $SAMPLE.contaminated.fastq \
-		 -p $THREADS -1 ../${SAMPLE}_1.fastq -2 ../${SAMPLE}_2.fastq \
-		 --no-unal --rg-id $SAMPLE \
-		 --rg 'SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina' \
-		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE 2> $SAMPLE.contamination.log
-
-	if [ $? -ne 0 ]; then
-		echo "Error running bowtie2 for contamination"
-		cd ..
-		rm -rf contamination
-		exit -1
-	fi
-	
-	mv ${SAMPLE}.uncontaminated.1.fastq ../${SAMPLE}_1.fastq
-	mv ${SAMPLE}.uncontaminated.2.fastq ../${SAMPLE}_2.fastq 
-	cd ..
 fi
 
 ##############################################################################

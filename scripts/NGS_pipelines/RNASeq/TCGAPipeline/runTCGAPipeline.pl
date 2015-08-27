@@ -86,12 +86,6 @@ sub waitForSamples() {
 sub makeExpressionMatrices {
 	# Get the directory of where this script is.  
 	my $dirname = dirname(__FILE__);
-
-	# Get QC Metrics
-	my %QC_metrics;
-	for my $sampleName (sort keys %SAMPLES) {
-		
-	}	
 	
 	# Gene-level expression
 	my $abundanceFiles = "";
