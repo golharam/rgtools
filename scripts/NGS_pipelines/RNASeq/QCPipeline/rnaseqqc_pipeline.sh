@@ -335,7 +335,7 @@ then
 	cd contamination
 	$BOWTIE2 --no-mixed --un-conc $SAMPLE.uncontaminated.fastq \
 		 --al-conc $SAMPLE.contaminated.fastq \
-		 -p $THREADS -1 ../${SAMPLE}_1.fastq -2 ../${SAMPLE}_2.fastq \
+		 -p $THREADS -1 $FASTQ1 $FASTQ2 \
 		 --no-unal --rg-id $SAMPLE \
 		 --rg 'SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina' \
 		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE 2> $SAMPLE.contamination.log
