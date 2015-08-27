@@ -253,10 +253,10 @@ fi
 
 if [ ! -e $FASTQ1 ]
 then
-	echo "Unable to locate $FASTQ1.  Make sure full path is provided
+	echo "Unable to locate $FASTQ1.  Make sure full path is provided"
 	exit -1
 fi
-echo Using Fastq file(s):
+echo "Using Fastq file(s):"
 echo FASTQ1: $FASTQ1
 if [ -n "$FASTQ2" ]
 then
@@ -275,7 +275,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	$FASTQVALIDATOR --baseComposition --avgQual --disableSeqIDCheck --file $FASTQ1 > $SAMPLE.fq1Validator.txt
+	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ1 > $SAMPLE.fq1Validator.txt
 
 	if [ $? -ne 0 ]
 	then
@@ -291,7 +291,7 @@ then
         date '+%m/%d/%y %H:%M:%S'
         echo
 
-	$FASTQVALIDATOR --baseComposition --avgQual --disableSeqIDCheck --file $FASTQ2 > $SAMPLE.fq2Validator.txt
+	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ2 > $SAMPLE.fq2Validator.txt
 
         if [ $? -ne 0 ]
         then
@@ -301,9 +301,9 @@ then
         fi
 
 fi
-exit 0
+
 ##############################################################################
-# Step 4: Run FastQC
+# Step 3: Run FastQC
 ##############################################################################
 FASTQC1=`basename $FASTQ1 .fastq.gz`
 if [ ! -e "${FASTQC1}_fastqc.zip" ]
@@ -321,9 +321,9 @@ then
 	        exit -1
 	fi
 fi
-
+exit 0
 ##############################################################################
-# Step 5: Perform contamination detection
+# Step 4: Perform contamination detection
 ##############################################################################
 if [ ! -d contamination ]
 then
