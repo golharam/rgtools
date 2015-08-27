@@ -135,6 +135,9 @@ SRA_DIR=$EXT_PKGS_DIR/sratoolkit-2.5.2/bin
 UBU_DIR=$EXT_PKGS_DIR/ubu
 UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
 
+# Reference data
+CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/bowtie2_index/contamination
+
 # Start Analysis
 echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
@@ -335,10 +338,10 @@ then
 	cd contamination
 	$BOWTIE2 --no-mixed --un-conc $SAMPLE.uncontaminated.fastq \
 		 --al-conc $SAMPLE.contaminated.fastq \
-		 -p $THREADS -1 $FASTQ1 $FASTQ2 \
+		 -p $THREADS -1 $FASTQ1 -2 $FASTQ2 \
 		 --no-unal --rg-id $SAMPLE \
-		 --rg 'SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina' \
-		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE 2> $SAMPLE.contamination.log
+		 --rg "SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina" \
+		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE 2>$SAMPLE.contamination.log
 
 	if [ $? -ne 0 ]; then
 		echo "Error running bowtie2 for contamination"
