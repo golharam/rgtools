@@ -132,6 +132,7 @@ RGTOOLS_DIR=$EXT_PKGS_DIR/rgtools
 RSEM_DIR=$EXT_PKGS_DIR/RSEM-1.2.20
 SAMTOOLS=$EXT_PKGS_DIR/samtools-0.1.19/samtools
 SRA_DIR=$EXT_PKGS_DIR/sratoolkit-2.5.2/bin
+TOPHAT2=$EXT_PKGS_DIR/tophat-2.1.0/tophat2
 UBU_DIR=$EXT_PKGS_DIR/ubu
 UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
 
@@ -388,9 +389,10 @@ else
 	# Nothing to do here since we've got the uncontaminated set of reads in
 	# ${SAMPLE}_1.fastq.gz and ${SAMPLE}_2.fastq.gz
 fi
-exit 0
 
-# 4.  Run tophat2
+##############################################################################
+# Step 6: Run tophat2
+##############################################################################
 if [ ! -d tophat_out ]
 then
 	echo Running tophat2
@@ -399,8 +401,8 @@ then
 	echo
 
 	# TBD: Output unaligned reads as well, or else CollectAlignmentMetrics thinks all the reads aligned.
-	tophat2 -p $THREADS \
-		--rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
+	$TOPHAT2 -p $THREADS \
+		 --rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
 		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE ${SAMPLE}_1.fastq.gz ${SAMPLE}_2.fastq.gz
 
 	if [ $? -ne 0 ] && [ ! -e tophat_out/accepted_hits.bam ]
@@ -417,6 +419,7 @@ then
         echo "Runng tophat2 took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
 	echo
 fi
+exit 0
 
 # 5. Re-sort sequenences
 if [ ! -e ${SAMPLE}.bam ]
