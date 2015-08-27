@@ -251,8 +251,12 @@ then
         FASTQ2=$FILENAME
 fi
 
-echo
-echo Using
+if [ ! -e $FASTQ1 ]
+then
+	echo "Unable to locate $FASTQ1.  Make sure full path is provided
+	exit -1
+fi
+echo Using Fastq file(s):
 echo FASTQ1: $FASTQ1
 if [ -n "$FASTQ2" ]
 then
@@ -263,56 +267,7 @@ analysis_date_started=$(date +"%s")
 echo
 
 ##############################################################################
-# Step 2: Unzip the FASTQs
-##############################################################################
-if [ ! -e ${SAMPLE}_1.fastq ]; then
-
-	FILETYPE=`file $FASTQ1 | cut -f 2 -d ' '`
-
-	if [ "$FILETYPE" == "gzip" ]
-	then
-		echo "Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
-		date '+%m/%d/%y %H:%M:%S'
-		echo
-
-		gunzip -dc $FASTQ1 > ${SAMPLE}_1.fastq
-	                                
-		if [ $? -ne 0 ]; then
-			echo "Error Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
-			rm ${SAMPLE}_1.fastq
-			exit -1
-		fi
-	else
-		echo "$FASTQ1 is $FILETYPE.  Not uncompressing"
-		ln -s $FASTQ1 ${SAMPLE}_1.fastq
-	fi
-fi
-
-if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
-
-	FILETYPE=`file $FASTQ2 | cut -f 2 -d ' '`
-
-        if [ "$FILETYPE" == "gzip" ]
-        then
-	        echo "Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
-		date '+%m/%d/%y %H:%M:%S'
-		echo
-
-	        gunzip -dc $FASTQ2 > ${SAMPLE}_2.fastq
-
-	        if [ $? -ne 0 ]; then
-	                echo "Error Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
-	                rm ${SAMPLE}_2.fastq
-	                exit -1
-		fi
-	else
-		echo "$FASTQ2 is $FILETYPE.  Not uncompressing"
-		ln -s $FASTQ2 ${SAMPLE}_2.fastq
-	fi
-fi
-
-##############################################################################
-# Step 3: Run FastQ Validator
+# Step 2: Run FastQ Validator
 ##############################################################################
 if [ ! -e $SAMPLE.fq1Validator.txt ]
 then
@@ -320,7 +275,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ1 > $SAMPLE.fq1Validator.txt
+	$FASTQVALIDATOR --baseComposition --avgQual --disableSeqIDCheck --file $FASTQ1 > $SAMPLE.fq1Validator.txt
 
 	if [ $? -ne 0 ]
 	then
@@ -336,7 +291,7 @@ then
         date '+%m/%d/%y %H:%M:%S'
         echo
 
-	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ2 > $SAMPLE.fq2Validator.txt
+	$FASTQVALIDATOR --baseComposition --avgQual --disableSeqIDCheck --file $FASTQ2 > $SAMPLE.fq2Validator.txt
 
         if [ $? -ne 0 ]
         then
@@ -346,7 +301,7 @@ then
         fi
 
 fi
-
+exit 0
 ##############################################################################
 # Step 4: Run FastQC
 ##############################################################################
