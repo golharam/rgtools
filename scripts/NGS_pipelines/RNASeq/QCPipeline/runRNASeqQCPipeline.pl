@@ -139,7 +139,7 @@ sub collectMetrics {
 		# Collect Contamination Metrics
 		open(F, "<$sampleName/contamination/$sampleName.contamination.log")
 			|| die "Unable to open $sampleName/contamination/$sampleName.contamination.log\n";
-		my @data = <F>;
+		@data = <F>;
 		close(F);
 		chomp @data;
 		my $totalReadPairs = $1 if ($data[0] =~ m/^(\d+)/);
@@ -184,56 +184,58 @@ sub collectMetrics {
 }
 
 sub printMetrics {
+	open(QC "<qcMetrics.txt") || die "Unable to open qcMetrics.txt";
+	
 	for my $fields (@FASTQVALIDATOR_METRICS, @FASTQC_METRICS, @CONTAMINATION_METRICS, @PICARD_ALNMETRICS, @PICARD_INSERTSIZEMETRICS, @PICARD_RNASEQMETRICS) {
-		print "\t$fields";
+		print QC "\t$fields";
 	}
-	print "\n";
+	print QC "\n";
 
 	for my $sampleName (sort keys %SAMPLES) {
-		print "$sampleName";
+		print QC "$sampleName";
 
 		# Print out FastQValidator
 		for my $fields (@FASTQVALIDATOR_METRICS) {
-			print "\t".$SAMPLES{$sampleName}{'fastQValidator'}{$fields};
+			print QC "\t".$SAMPLES{$sampleName}{'fastQValidator'}{$fields};
 		}
 
 		# Print out FastQC
 		for my $fields (@FASTQC_METRICS) {
-			print "\t".$SAMPLES{$sampleName}{'FastQC'}{$fields};
+			print QC "\t".$SAMPLES{$sampleName}{'FastQC'}{$fields};
 		}
 
 		# Print out contamination metrics
 		for my $fields (@CONTAMINATION_METRICS) {
-			print "\t".$SAMPLES{$sampleName}{"contamination::$fields"};
+			print QC "\t".$SAMPLES{$sampleName}{"contamination::$fields"};
 		}
 		
 		# Print out Picard Alignment Metrics
 		for my $fields (@PICARD_ALNMETRICS) {
-			print "\t";
+			print QC "\t";
 			if (defined($SAMPLES{$sampleName}{'picard::AlignmentMetrics'}{$fields})) {
-				print $SAMPLES{$sampleName}{'picard::AlignmentMetrics'}{$fields};
+				print QC $SAMPLES{$sampleName}{'picard::AlignmentMetrics'}{$fields};
 			}
 		}
 
 		# Print out Picard Insert Size Metrics
 		for my $fields (@PICARD_INSERTSIZEMETRICS) {
-			print "\t";
+			print QC "\t";
 			if (defined($SAMPLES{$sampleName}{'picard::InsertSizeMetrics'}{$fields})) {
-				print $SAMPLES{$sampleName}{'picard::InsertSizeMetrics'}{$fields};
+				print QC $SAMPLES{$sampleName}{'picard::InsertSizeMetrics'}{$fields};
 			}
 		}
 
 		# Print out Picard RNA-Seq Metrics
 		for my $fields (@PICARD_RNASEQMETRICS) {
-			print "\t";
+			print QC "\t";
 			if (defined($SAMPLES{$sampleName}{'picard::RNASeqMetrics'}{$fields})) {
-				print $SAMPLES{$sampleName}{'picard::RNASeqMetrics'}{$fields};
+				print QC $SAMPLES{$sampleName}{'picard::RNASeqMetrics'}{$fields};
 			}
 		}
 
-		print "\n";
+		print QC "\n";
 	}
-	print "\n";
+	print QC "\n";
 }
 
 sub main {

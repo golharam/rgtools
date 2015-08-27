@@ -496,7 +496,8 @@ then
 		REF_FLAT=$REFERENCE_DIR/$REFERENCE/annotation/refSeq/refFlat.txt \
 		RIBOSOMAL_INTERVALS=$REFERENCE_DIR/$REFERENCE/annotation/refSeq/rRNA.list \
 		STRAND_SPECIFICITY=NONE \
-		CHART_OUTPUT=$SAMPLE.rnaseq.pdf
+		CHART_OUTPUT=$SAMPLE.rnaseq.pdf \
+		TMP_DIR=.
 
         if [ $? -ne 0 ]
         then
