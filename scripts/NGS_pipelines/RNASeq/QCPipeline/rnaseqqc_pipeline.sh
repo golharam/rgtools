@@ -92,8 +92,11 @@ do
 done
 
 if [ $HELP == 1 ]; then
-	echo "Usage 1: $0 <options> [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
-	echo "Usage 2: $0 <options> [-s|--sample <SRA ID>] [--sraftp <ftp location>]" 
+	echo "Usage 1: $0 <options> <usage>"
+	echo "Usage 2: $0 <options> <usage>"
+	echo "where usage:"
+	echo "Usage 1: [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
+	echo "Usage 2: [-s|--sample <SRA ID>] [--sraftp <ftp location>]" 
 	echo "Options:"
 	echo "	-a|--aws"
 	echo "  --delete-intermediate (delete intermediate files, not including source fq.gz) (not yet implemented)"
