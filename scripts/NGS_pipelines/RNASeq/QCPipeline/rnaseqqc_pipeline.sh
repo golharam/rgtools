@@ -312,7 +312,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	$FASTQC --outdir=. --extract -t 2 $FASTQ1 $FASTQ2
+	$FASTQC --quiet --outdir=. --extract -t 2 $FASTQ1 $FASTQ2
 
 	if [ $? -ne 0 ]
 	then
@@ -321,7 +321,7 @@ then
 	        exit -1
 	fi
 fi
-exit 0
+
 ##############################################################################
 # Step 4: Perform contamination detection
 ##############################################################################
@@ -351,7 +351,7 @@ then
 	mv ${SAMPLE}.uncontaminated.2.fastq ../${SAMPLE}_2.fastq 
 	cd ..
 fi
-
+exit 0
 ##############################################################################
 # Step 6: Subsample
 ##############################################################################
