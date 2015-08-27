@@ -336,8 +336,8 @@ then
 
 	mkdir contamination
 	cd contamination
-	$BOWTIE2 --no-mixed --un-conc $SAMPLE.uncontaminated.fastq \
-		 --al-conc $SAMPLE.contaminated.fastq \
+	$BOWTIE2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
+		 --al-conc-gz $SAMPLE.contaminated.fastq.gz \
 		 -p $THREADS -1 $FASTQ1 -2 $FASTQ2 \
 		 --no-unal --rg-id $SAMPLE \
 		 --rg "SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina" \
@@ -350,13 +350,13 @@ then
 		exit -1
 	fi
 	
-	mv ${SAMPLE}.uncontaminated.1.fastq ../${SAMPLE}_1.fastq
-	mv ${SAMPLE}.uncontaminated.2.fastq ../${SAMPLE}_2.fastq 
+	mv ${SAMPLE}.uncontaminated.fastq.1.gz ../${SAMPLE}_1.fastq.gz
+	mv ${SAMPLE}.uncontaminated.fastq.2.gz ../${SAMPLE}_2.fastq.gz 
 	cd ..
 fi
 exit 0
 ##############################################################################
-# Step 6: Subsample
+# Step 5: Subsample
 ##############################################################################
 if [ "$SUBSAMPLE" -ne "0" ]; then
 	if [ ! -e ${SAMPLE}_1.fastq ]; then
