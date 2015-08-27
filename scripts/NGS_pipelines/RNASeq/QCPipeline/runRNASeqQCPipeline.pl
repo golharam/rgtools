@@ -184,7 +184,7 @@ sub collectMetrics {
 }
 
 sub printMetrics {
-	open(QC "<qcMetrics.txt") || die "Unable to open qcMetrics.txt";
+	open(QC, "<qcMetrics.txt") || die "Unable to open qcMetrics.txt";
 	
 	for my $fields (@FASTQVALIDATOR_METRICS, @FASTQC_METRICS, @CONTAMINATION_METRICS, @PICARD_ALNMETRICS, @PICARD_INSERTSIZEMETRICS, @PICARD_RNASEQMETRICS) {
 		print QC "\t$fields";
@@ -236,6 +236,7 @@ sub printMetrics {
 		print QC "\n";
 	}
 	print QC "\n";
+	close(QC);
 }
 
 sub main {
