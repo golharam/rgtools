@@ -16,7 +16,7 @@ OUTDIR=`pwd`
 DELETE_INTERMEDIATE=0
 THREADS=8
 REFERENCE=hg19
-SUBSAMPLE=500000
+SUBSAMPLE=0
 
 if [ $# -eq 0 ]
 then
@@ -351,10 +351,11 @@ then
 	fi
 	
 	mv ${SAMPLE}.uncontaminated.fastq.1.gz ../${SAMPLE}_1.fastq.gz
-	mv ${SAMPLE}.uncontaminated.fastq.2.gz ../${SAMPLE}_2.fastq.gz 
+	mv ${SAMPLE}.uncontaminated.fastq.2.gz ../${SAMPLE}_2.fastq.gz
+	
 	cd ..
 fi
-exit 0
+
 ##############################################################################
 # Step 5: Subsample
 ##############################################################################
@@ -384,12 +385,10 @@ if [ "$SUBSAMPLE" -ne "0" ]; then
 else
 	echo "Not subsampling...using entire set of reads..."
 	echo
-
-	ln -s $FASTQ1 ${SAMPLE}_1.fastq.gz
-	if [ -n "$FASTQ2" ]; then
-		ln -s $FASTQ2 ${SAMPLE}_2.fastq.gz
-	fi
+	# Nothing to do here since we've got the uncontaminated set of reads in
+	# ${SAMPLE}_1.fastq.gz and ${SAMPLE}_2.fastq.gz
 fi
+exit 0
 
 # 4.  Run tophat2
 if [ ! -d tophat_out ]
