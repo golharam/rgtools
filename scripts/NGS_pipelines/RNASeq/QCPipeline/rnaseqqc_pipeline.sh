@@ -16,6 +16,7 @@ OUTDIR=`pwd`
 DELETE_INTERMEDIATE=0
 THREADS=8
 REFERENCE=hg19
+SUBSAMPLE=500000
 
 if [ $# -eq 0 ]
 then
@@ -250,6 +251,8 @@ then
         FASTQ2=$FILENAME
 fi
 
+echo
+echo Using
 echo FASTQ1: $FASTQ1
 if [ -n "$FASTQ2" ]
 then
