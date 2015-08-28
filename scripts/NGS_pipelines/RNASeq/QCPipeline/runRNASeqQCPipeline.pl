@@ -148,6 +148,25 @@ sub collectMetrics {
 		$SAMPLES{$sampleName}{'contamination::contaminatedReadPairs'} = $contaminatedReadPairs;
 		$SAMPLES{$sampleName}{'contamination::uncontaminatedReadPairs'} = $uncontaminatedReadPairs;
 
+		# Collect ERCC Metrics
+		# $SAMPLE.erccMetrics.txt has the format:
+		# chr
+		# start
+		# end
+		# The number of reads that overlapped an ERCC sequence.
+		# The number of bases that had non-zero coverage.
+		# The length of the ERCC entry.
+		# The fraction of bases that had non-zero coverage.
+		open(F", <$sampleName/$sampleName.erccMetrics.txt") || die "Unable to open $sampleName/$sampleName.erccMetrics.txt";
+		@data = <F>;
+		close(F);
+		chomp(@data);
+		$SAMPLES{$sampleName}{'erccReadCount'} = 0;
+		for (my $i = 0; $i < scalar(@data); $i++) {
+			my @fields = split(/\t/, $data[$i]);
+			$$SAMPLES{$sampleName}{'erccReadCount'} += $fields[3];
+		}
+		
 		# Collect Picard Alignment Metrics
 		open(F, "<$sampleName/$sampleName.alnMetrics.txt") || die "Unable to open $sampleName/$sampleName.alnMetrics.txt";
 		@data = <F>;

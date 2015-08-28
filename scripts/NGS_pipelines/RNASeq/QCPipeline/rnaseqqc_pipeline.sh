@@ -515,7 +515,27 @@ then
 fi
 
 ##############################################################################
-# 11. Cleanup intermediate output
+# 11.  Collect ERCC Metrics
+##############################################################################
+if [ ! -e ${SAMPLE}.erccMetrics.txt ]
+then
+        echo Collecting ERCC Metrics
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
+	$BEDTOOLS coverage -a $REFERENCE_DIR/ERCC92/ERCC92.bed -b ${SAMPLE}.bam > ${SAMPLE}.erccMetrics.txt
+	
+        if [ $? -ne 0 ]
+        then
+                echo "Error collecting ercc metrics"
+                rm ${SAMPLE}.erccMetrics.txt
+                exit -1
+        fi
+
+fi
+
+##############################################################################
+# 12. Cleanup intermediate output
 ##############################################################################
 if [ $AWS == 1 ]
 then
@@ -524,7 +544,7 @@ fi
 #rm -rf *.fastq tophat_out/ $SAMPLE.ba? 
 
 ##############################################################################
-# 12.  Transfer data to final resting place
+# 13.  Transfer data to final resting place
 ##############################################################################
 cd ..
 if [ $AWS == 0 ]
