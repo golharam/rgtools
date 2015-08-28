@@ -110,13 +110,10 @@ fi
 
 if [ $AWS == 0 ]; then
 	EXT_PKGS_DIR=/apps/sys/galaxy/external_packages
-	REFERENCE_DIR=/ng18/galaxy/reference_genomes
-	TMP_DIR=/scratch
-	
+	REFERENCE_DIR=/ng18/galaxy/reference_genomes	
 else
 	EXT_PKGS_DIR=/ngs/apps
 	REFERENCE_DIR=/ngs/reference/
-	TMP_DIR=/scratch
 fi
 
 # Applications / Programs
@@ -132,6 +129,7 @@ RGTOOLS_DIR=$EXT_PKGS_DIR/rgtools
 RSEM_DIR=$EXT_PKGS_DIR/RSEM-1.2.20
 SAMTOOLS=$EXT_PKGS_DIR/samtools-0.1.19/samtools
 SRA_DIR=$EXT_PKGS_DIR/sratoolkit-2.5.2/bin
+TMP_DIR=/scratch
 TOPHAT2=$EXT_PKGS_DIR/tophat-2.1.0/tophat2
 UBU_DIR=$EXT_PKGS_DIR/ubu
 UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
@@ -420,7 +418,9 @@ then
 	echo
 fi
 
-# 5. Re-sort sequenences
+##############################################################################
+# Step 7: Re-sort sequenences
+##############################################################################
 if [ ! -e ${SAMPLE}.bam ]
 then
 	echo Resorting BAM file
@@ -442,7 +442,9 @@ then
         fi
 fi
 
-# 6.  Collect Alignment Summary Metrics
+##############################################################################
+# Step 8: Collect Alignment Summary Metrics
+##############################################################################
 if [ ! -e ${SAMPLE}.alnMetrics.txt ]
 then
 	echo Collect Alignment Summary Metrics
@@ -462,7 +464,9 @@ then
 	fi
 fi
 
-# 7.  Collect Insert Size Metrics
+##############################################################################
+# 9.  Collect Insert Size Metrics
+##############################################################################
 if [ ! -e ${SAMPLE}.insertSizeMetrics.txt ]
 then
         echo Collect InsertSize Metrics
@@ -483,7 +487,9 @@ then
         fi
 fi
 
-# 7.  Collect RNA Seq Metrics
+##############################################################################
+# 10.  Collect RNA Seq Metrics
+##############################################################################
 if [ ! -e ${SAMPLE}.rnaseqMetrics.txt ]
 then
         echo Collect RNASeq Metrics
@@ -508,13 +514,18 @@ then
 
 fi
 
-# 19. Cleanup large intermediate output
+##############################################################################
+# 11. Cleanup intermediate output
+##############################################################################
 if [ $AWS == 1 ]
 then
 	rm $FASTQ1 $FASTQ2
 fi
-rm -rf *.fastq tophat_out/ $SAMPLE.ba? 
+#rm -rf *.fastq tophat_out/ $SAMPLE.ba? 
 
+##############################################################################
+# 12.  Transfer data to final resting place
+##############################################################################
 cd ..
 if [ $AWS == 0 ]
 then
@@ -533,6 +544,9 @@ else
 	rm -rf $SAMPLE_DIR 2>/dev/null
 fi
 
+##############################################################################
+# Done.
+##############################################################################
 echo
 echo $SAMPLE Complete
 date '+%m/%d/%y %H:%M:%S'
