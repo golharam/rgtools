@@ -117,7 +117,7 @@ else
 fi
 
 # Applications / Programs
-BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin
+BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.23.0/bin/bedtools
 BOWTIE2=$EXT_PKGS_DIR/bowtie2-2.2.6/bowtie2
 FASTQC=$EXT_PKGS_DIR/FastQC-0.11.2/fastqc
 FASTQVALIDATOR=$EXT_PKGS_DIR/fastQValidator-0.1.1a/bin/fastQValidator
