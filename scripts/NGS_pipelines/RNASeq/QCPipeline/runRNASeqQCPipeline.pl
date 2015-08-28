@@ -11,6 +11,7 @@ my %SAMPLES;
 my @FASTQVALIDATOR_METRICS = ('fq1RawCount' , 'fq2RawCount');
 my @FASTQC_METRICS = ('pctGC');
 my @CONTAMINATION_METRICS = ('contaminatedReadPairs', 'uncontaminatedReadPairs');
+my @ERCC_METRICS = ('erccReadCount');
 my @PICARD_ALNMETRICS = ('TOTAL_READS', 'MEAN_READ_LENGTH', 'PF_READS', 'PF_NOISE_READS', 'PF_READS_ALIGNED', 'PF_ALIGNED_BASES', 'PF_HQ_ALIGNED_READS', 'PF_HQ_ALIGNED_BASES', 'PF_HQ_ALIGNED_Q20_BASES', 'PF_HQ_MEDIAN_MISMATCHES', 'PF_MISMATCH_RATE', 'PF_HQ_ERROR_RATE', 'PF_INDEL_RATE', 'READS_ALIGNED_IN_PAIRS', 'PCT_READS_ALIGNED_IN_PAIRS', 'BAD_CYCLES', 'STRAND_BALANCE', 'PCT_CHIMERAS', 'PCT_ADAPTER');
 my @PICARD_INSERTSIZEMETRICS = ('MEDIAN_INSERT_SIZE', 'MEDIAN_ABSOLUTE_DEVIATION', 'MIN_INSERT_SIZE', 'MAX_INSERT_SIZE', 'MEAN_INSERT_SIZE', 'STANDARD_DEVIATION', 'READ_PAIRS', 'PAIR_ORIENTATION', 'WIDTH_OF_10_PERCENT', 'WIDTH_OF_20_PERCENT', 'WIDTH_OF_30_PERCENT', 'WIDTH_OF_40_PERCENT', 'WIDTH_OF_50_PERCENT', 'WIDTH_OF_60_PERCENT', 'WIDTH_OF_70_PERCENT', 'WIDTH_OF_80_PERCENT', 'WIDTH_OF_90_PERCENT', 'WIDTH_OF_99_PERCENT');
 my @PICARD_RNASEQMETRICS = ('PF_BASES', 'PF_ALIGNED_BASES', 'RIBOSOMAL_BASES', 'CODING_BASES', 'UTR_BASES', 'INTRONIC_BASES', 'INTERGENIC_BASES', 'IGNORED_READS', 'CORRECT_STRAND_READS', 'INCORRECT_STRAND_READS', 'PCT_RIBOSOMAL_BASES', 'PCT_CODING_BASES', 'PCT_UTR_BASES', 'PCT_INTRONIC_BASES', 'PCT_INTERGENIC_BASES', 'PCT_MRNA_BASES', 'PCT_USABLE_BASES', 'PCT_CORRECT_STRAND_READS', 'MEDIAN_CV_COVERAGE', 'MEDIAN_5PRIME_BIAS', 'MEDIAN_3PRIME_BIAS', 'MEDIAN_5PRIME_TO_3PRIME_BIAS');
@@ -157,14 +158,14 @@ sub collectMetrics {
 		# The number of bases that had non-zero coverage.
 		# The length of the ERCC entry.
 		# The fraction of bases that had non-zero coverage.
-		open(F", <$sampleName/$sampleName.erccMetrics.txt") || die "Unable to open $sampleName/$sampleName.erccMetrics.txt";
+		open(F, "<$sampleName/$sampleName.erccMetrics.txt") || die "Unable to open $sampleName/$sampleName.erccMetrics.txt";
 		@data = <F>;
 		close(F);
 		chomp(@data);
 		$SAMPLES{$sampleName}{'erccReadCount'} = 0;
 		for (my $i = 0; $i < scalar(@data); $i++) {
 			my @fields = split(/\t/, $data[$i]);
-			$$SAMPLES{$sampleName}{'erccReadCount'} += $fields[3];
+			$SAMPLES{$sampleName}{'erccReadCount'} += $fields[3];
 		}
 		
 		# Collect Picard Alignment Metrics
@@ -205,7 +206,7 @@ sub collectMetrics {
 sub printMetrics {
 	open(QC, ">qcMetrics.txt") || die "Unable to open qcMetrics.txt";
 	
-	for my $fields (@FASTQVALIDATOR_METRICS, @FASTQC_METRICS, @CONTAMINATION_METRICS, @PICARD_ALNMETRICS, @PICARD_INSERTSIZEMETRICS, @PICARD_RNASEQMETRICS) {
+	for my $fields (@FASTQVALIDATOR_METRICS, @FASTQC_METRICS, @CONTAMINATION_METRICS, @ERCC_METRICS, @PICARD_ALNMETRICS, @PICARD_INSERTSIZEMETRICS, @PICARD_RNASEQMETRICS) {
 		print QC "\t$fields";
 	}
 	print QC "\n";
@@ -226,6 +227,12 @@ sub printMetrics {
 		# Print out contamination metrics
 		for my $fields (@CONTAMINATION_METRICS) {
 			print QC "\t".$SAMPLES{$sampleName}{"contamination::$fields"};
+		}
+		
+		# Print out ERCC Metrics
+		for my $fields (@ERCC_METRICS) {
+			print QC "\t".$SAMPLES{$sampleName}{$fields};
+		
 		}
 		
 		# Print out Picard Alignment Metrics
