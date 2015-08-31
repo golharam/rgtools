@@ -9,7 +9,7 @@ my %SAMPLES;
 # FastQValidator
 # FastQC
 my @FASTQVALIDATOR_METRICS = ('fq1RawCount' , 'fq2RawCount');
-my @FASTQC_METRICS = ('pctGC');
+my @FASTQC_METRICS = ('pctA', 'pctC', 'pctG', 'pctT', 'pctGC');
 my @CONTAMINATION_METRICS = ('contaminatedReadPairs', 'uncontaminatedReadPairs');
 my @ERCC_METRICS = ('erccReadCount');
 my @PICARD_ALNMETRICS = ('TOTAL_READS', 'MEAN_READ_LENGTH', 'PF_READS', 'PF_NOISE_READS', 'PF_READS_ALIGNED', 'PF_ALIGNED_BASES', 'PF_HQ_ALIGNED_READS', 'PF_HQ_ALIGNED_BASES', 'PF_HQ_ALIGNED_Q20_BASES', 'PF_HQ_MEDIAN_MISMATCHES', 'PF_MISMATCH_RATE', 'PF_HQ_ERROR_RATE', 'PF_INDEL_RATE', 'READS_ALIGNED_IN_PAIRS', 'PCT_READS_ALIGNED_IN_PAIRS', 'BAD_CYCLES', 'STRAND_BALANCE', 'PCT_CHIMERAS', 'PCT_ADAPTER');
@@ -124,7 +124,19 @@ sub collectMetrics {
 				# TBD: This should come from picard::CollectAlignmentMetrics
 				$SAMPLES{$sampleName}{'FastQC'}{'sequenceLength'} = $1;
 			}
-			if ($data[9] =~ m/\%GC\t(\d+)/) {
+			if ($data[9] =~ m/\%A\t(\d+)/) {
+				$SAMPLES{$sampleName}{'FastQC'}{'pctA'} = $1;
+			}
+			if ($data[10] =~ m/\%C\t(\d+)/) {
+				$SAMPLES{$sampleName}{'FastQC'}{'pctC'} = $1;
+			}
+			if ($data[11] =~ m/\%G\t(\d+)/) {
+				$SAMPLES{$sampleName}{'FastQC'}{'pctG'} = $1;
+			}
+			if ($data[12] =~ m/\%T\t(\d+)/) {
+				$SAMPLES{$sampleName}{'FastQC'}{'pctT'} = $1;
+			}
+			if ($data[13] =~ m/\%GC\t(\d+)/) {
 				$SAMPLES{$sampleName}{'FastQC'}{'pctGC'} = $1;
 			}
 			

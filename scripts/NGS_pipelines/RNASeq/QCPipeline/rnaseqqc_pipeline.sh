@@ -119,7 +119,7 @@ fi
 # Applications / Programs
 BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.24.0/bin/bedtools
 BOWTIE2=$EXT_PKGS_DIR/bowtie2-2.2.6/bowtie2
-FASTQC=$EXT_PKGS_DIR/FastQC-0.11.2/fastqc
+FASTQC=$EXT_PKGS_DIR/FastQC-0.11.3-RG/fastqc
 FASTQVALIDATOR=$EXT_PKGS_DIR/fastQValidator-0.1.1a/bin/fastQValidator
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
 #MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multi_threads_2.0.1.9/bin
