@@ -9,10 +9,9 @@
 # Set default values.  These can be set via command-line options only.  
 # Setting them here overrides environment variables
 ###############################################################################
-VERSION=0.1
+VERSION=0.2
 HELP=0
-AWS=0
-OUTDIR=`pwd`
+OUTDIR=`pwd`/analysis
 DELETE_INTERMEDIATE=0
 THREADS=8
 REFERENCE=hg19ERCC
@@ -108,31 +107,40 @@ if [ $HELP == 1 ]; then
 	exit 0
 fi
 
+# If AWS is not set as an environment variable, set it to 0
+if [ -z "$AWS" ]
+then
+	AWS=0
+fi
+
 if [ $AWS == 0 ]; then
 	EXT_PKGS_DIR=/apps/sys/galaxy/external_packages
 	REFERENCE_DIR=/ng18/galaxy/reference_genomes	
 else
 	EXT_PKGS_DIR=/ngs/apps
-	REFERENCE_DIR=/ngs/reference/
+	REFERENCE_DIR=/ngs/reference
 fi
 
 # Applications / Programs
 BEDTOOLS=$EXT_PKGS_DIR/bedtools-2.24.0/bin/bedtools
-BOWTIE2=$EXT_PKGS_DIR/bowtie2-2.2.6/bowtie2
+BOWTIE2=$EXT_PKGS_DIR/bowtie2-2.2.6/
 FASTQC=$EXT_PKGS_DIR/FastQC-0.11.3-RG/fastqc
 FASTQVALIDATOR=$EXT_PKGS_DIR/fastQValidator-0.1.1a/bin/fastQValidator
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
 #MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multi_threads_2.0.1.9/bin
 PICARD_JAR=$EXT_PKGS_DIR/picard-tools-1.137/picard.jar
+R=/ngs/apps/R-3.2.2/bin/
 RGTOOLS_DIR=$EXT_PKGS_DIR/rgtools
 #RSEM_DIR=$EXT_PKGS_DIR/rsem-1.1.13
 RSEM_DIR=$EXT_PKGS_DIR/RSEM-1.2.20
 SAMTOOLS=$EXT_PKGS_DIR/samtools-0.1.19/samtools
 SRA_DIR=$EXT_PKGS_DIR/sratoolkit-2.5.2/bin
 TMP_DIR=/scratch
-TOPHAT2=$EXT_PKGS_DIR/tophat-2.1.0/tophat2
+TOPHAT2=$EXT_PKGS_DIR/tophat-2.1.0/
 UBU_DIR=$EXT_PKGS_DIR/ubu
 UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
+
+export PATH=$BOWTIE2:$R:$TOPHAT2:$PATH
 
 # Reference data
 CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/bowtie2_index/contamination
@@ -163,6 +171,7 @@ echo
 # Step 1: Download the file to the local scratch space
 # If SRA, download from SRA
 # If FTP, download from FTP
+# If on AWS, copy data from kraken
 ##############################################################################
 if [ -n "$SRAFTP" ]
 then
@@ -217,9 +226,7 @@ then
 	then
 		FASTQ2=${SAMPLE}_2.fastq.gz
 	fi
-fi
-# If FTP location, then download from FTP
-if [[ $FASTQ1 == ftp* ]]
+elif [[ $FASTQ1 == ftp* ]] # If FTP location, then download from FTP
 then
 	echo "Downloading $FASTQ1"
 	date '+%m/%d/%y %H:%M:%S'
@@ -251,6 +258,37 @@ then
                 exit -1
         fi
         FASTQ2=$FILENAME
+elif [ $AWS == 1 ] # Copy the data from kraken
+then
+	echo "Downloading from kraken: $FASTQ1"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+	
+	B=`basename $FASTQ1`
+	scp golharr@kraken.pri.bms.com:$FASTQ1 .
+	
+        if [ $? -ne 0 ]
+        then
+                echo "Error downloading $FASTQ1"
+                rm -f $B 2>/dev/null
+                exit -1
+        fi
+	FASTQ1=`pwd`/$B
+	
+	echo "Downloading from kraken: $FASTQ2"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+	
+	B=`basename $FASTQ2`
+	scp golharr@kraken.pri.bms.com:$FASTQ2 .
+	
+        if [ $? -ne 0 ]
+        then
+                echo "Error downloading $FASTQ2"
+                rm -f $B 2>/dev/null
+                exit -1
+        fi
+	FASTQ2=`pwd`/$B
 fi
 
 if [ ! -e $FASTQ1 ]
@@ -267,6 +305,58 @@ fi
 date '+%m/%d/%y %H:%M:%S'
 analysis_date_started=$(date +"%s")
 echo
+
+##############################################################################
+# Step 1.5: Unzip if not already unzipped (this is for Galaxy)
+##############################################################################
+if [ ! -e ${SAMPLE}_1.fastq ]; then
+	if [ $(file $FASTQ1 | cut -d' ' -f2) == "gzip" ]; then
+		echo
+		echo
+		echo "Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		gunzip -dc $FASTQ1 > ${SAMPLE}_1.fastq
+
+		if [ $? -ne 0 ]; then
+			echo "Error Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
+			rm ${SAMPLE}_1.fastq
+			exit -1
+		fi
+
+	else
+		echo
+		echo "$FASTQ1 is not gzip compressed:"
+		echo $(file $FASTQ1)
+		echo
+
+		ln -s $FASTQ1 ${SAMPLE}_1.fastq
+	fi
+fi
+
+if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
+	if [ $(file $FASTQ2 | cut -d' ' -f2) == "gzip" ]; then
+		echo "Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		gunzip -dc $FASTQ2 > ${SAMPLE}_2.fastq
+
+		if [ $? -ne 0 ]; then
+			echo "Error Unzipping $FASTQ2 > ${SAMPLE}_2.fastq"
+			rm ${SAMPLE}_2.fastq
+			exit -1
+		fi
+	else
+		echo
+		echo "$FASTQ2 is not gzip compressed"
+		echo $(file $FASTQ2)
+		echo
+
+		ln -s $FASTQ ${SAMPLE}_1.fastq
+	fi
+fi
 
 ##############################################################################
 # Step 2: Run FastQ Validator
@@ -307,8 +397,7 @@ fi
 ##############################################################################
 # Step 3: Run FastQC
 ##############################################################################
-FASTQC1=`basename $FASTQ1 .fastq.gz`
-if [ ! -e "${FASTQC1}_fastqc.zip" ]
+if [ ! -e "${SAMPLE}_fastqc.zip" ]
 then
 	echo "Running FastQC"
 	date '+%m/%d/%y %H:%M:%S'
@@ -335,7 +424,7 @@ then
 
 	mkdir contamination
 	cd contamination
-	$BOWTIE2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
+	$BOWTIE2/bowtie2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
 		 --al-conc-gz $SAMPLE.contaminated.fastq.gz \
 		 -p $THREADS -1 $FASTQ1 -2 $FASTQ2 \
 		 --no-unal --rg-id $SAMPLE \
@@ -343,14 +432,34 @@ then
 		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE 2>$SAMPLE.contamination.log
 
 	if [ $? -ne 0 ]; then
-		echo "Error running bowtie2 for contamination"
+		echo "Error running bowtie2 for contamination:"
+		cat $SAMPLE.contamination.log
 		cd ..
 		rm -rf contamination
 		exit -1
 	fi
+
+	echo Resorting contamination BAM file
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	java -Xmx4G -jar $PICARD_JAR ReorderSam \
+		R=$REFERENCE_DIR/contamination/contamination.fa \
+		INPUT=$SAMPLE.contaminated.sam \
+		OUTPUT=$SAMPLE.contaminated.bam \
+		CREATE_INDEX=true \
+		TMP_DIR=.
+
+        if [ $? -ne 0 ]
+        then
+                echo "Error resorting contaminated bam file"
+                $SAMPLE.contaminated.bam
+                exit -1
+        fi
 	
-	mv ${SAMPLE}.uncontaminated.fastq.1.gz ../${SAMPLE}_1.fastq.gz
-	mv ${SAMPLE}.uncontaminated.fastq.2.gz ../${SAMPLE}_2.fastq.gz
+	rm $SAMPLE.contaminated.sam
+	mv ${SAMPLE}.uncontaminated.fastq.1.gz ../
+	mv ${SAMPLE}.uncontaminated.fastq.2.gz ../
 	
 	cd ..
 fi
@@ -359,26 +468,26 @@ fi
 # Step 5: Subsample
 ##############################################################################
 if [ "$SUBSAMPLE" -ne "0" ]; then
-	if [ ! -e ${SAMPLE}_1.fastq ]; then
+	if [ ! -e ${SAMPLE}_1.subsampled.fastq ]; then
 		echo "Subsampling for $SUBSAMPLE reads..."
 		date '+%m/%d/%y %H:%M:%S'
 		echo
 
 		if [ -n "$FASTQ2" ]; then
-			RandomSubFq -w $SUBSAMPLE -i $FASTQ1 -i $FASTQ2 -o ${SAMPLE}_1.fastq -o ${SAMPLE}_2.fastq
+			RandomSubFq -w $SUBSAMPLE -i ${SAMPLE}_1.fastq.gz -i ${SAMPLE}_2.fastq.gz -o ${SAMPLE}_1.subsampled.fastq -o ${SAMPLE}_2.subsampled.fastq
 		else
-			RandomSubFq -w $SUBSAMPLE -i $FASTQ1 -o ${SAMPLE}_1.fastq
+			RandomSubFq -w $SUBSAMPLE -i ${SAMPLE}_1.fastq.gz -o ${SAMPLE}_1.subsampled.fastq
 		fi
 
 	        if [ $? -ne 0 ]; then
 	                echo "Error subsampling"
-	                rm ${SAMPLE}_?.fastq
+	                rm ${SAMPLE}_?.subsampled.fastq
 	                exit -1
 	        fi
 
-		gzip ${SAMPLE}_1.fastq
+		FASTQ1=${SAMPLE}_1.subsampled.fastq
 		if [ -n "$FASTQ2" ]; then
-			gzip ${SAMPLE}_2.fastq
+			FASTQ2=${SAMPLE}_2.subsampled.fastq
 		fi
 	fi
 else
@@ -399,9 +508,9 @@ then
 	echo
 
 	# TBD: Output unaligned reads as well, or else CollectAlignmentMetrics thinks all the reads aligned.
-	$TOPHAT2 -p $THREADS \
+	$TOPHAT2/tophat2 -p $THREADS \
 		 --rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
-		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE ${SAMPLE}_1.fastq.gz ${SAMPLE}_2.fastq.gz
+		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE $FASTQ1 FASTQ2
 
 	if [ $? -ne 0 ] && [ ! -e tophat_out/accepted_hits.bam ]
 	then
@@ -440,6 +549,7 @@ then
                 rm ${SAMPLE}.bam
                 exit -1
         fi
+        rm tophat_out/accepted_hits.bam
 fi
 
 ##############################################################################
@@ -466,6 +576,7 @@ fi
 
 ##############################################################################
 # 9.  Collect Insert Size Metrics
+#     TBD: Is this really needed?  This is mainly for DNA-Seq, I believe.
 ##############################################################################
 if [ ! -e ${SAMPLE}.insertSizeMetrics.txt ]
 then
@@ -529,7 +640,7 @@ then
         if [ $? -ne 0 ]
         then
                 echo "Error collecting ercc metrics"
-                rm ${SAMPLE}.erccMetrics.txt
+                cat ${SAMPLE}.erccMetrics.txt
                 exit -1
         fi
 
@@ -554,11 +665,12 @@ then
 	mv ${SAMPLE_DIR} ${OUTDIR}/${SAMPLE}
 else
 	# TBD: This is project specific and needs to be parameterized
-	aws s3 cp --recursive $SAMPLE_DIR s3://bmsrd-ngs-M2GEN/
-
+	#aws s3 cp --recursive $SAMPLE_DIR s3://bmsrd-ngs-M2GEN/
+	scp -r $SAMPLE_DIR golharr@kraken.pri.bms.com:/home/golharr/ngsprojects/M2GEN-TCGA/analysis/${SAMPLE}
+	
 	if [ $? -ne 0 ]
 	then
-		echo Error copying $SAMPLE_DIR to s3
+		echo Error copying $SAMPLE_DIR
 		exit -1
 	fi
 
