@@ -9,13 +9,11 @@
 # Set default values.  These can be set via command-line options only.  
 # Setting them here overrides environment variables
 ###############################################################################
-VERSION=0.2
+VERSION=0.3
 HELP=0
-OUTDIR=`pwd`/analysis
 DELETE_INTERMEDIATE=0
 THREADS=8
 REFERENCE=hg19ERCC
-SUBSAMPLE=0
 
 if [ $# -eq 0 ]
 then
@@ -107,10 +105,15 @@ if [ $HELP == 1 ]; then
 	exit 0
 fi
 
-# If AWS is not set as an environment variable, set it to 0
-if [ -z "$AWS" ]
-then
+# If variables are not set as an environment variable or as a parameter, set them to default here.
+if [ -z "$AWS" ]; then
 	AWS=0
+fi
+if [ -z "$OUTDIR" ]; then
+	OUTDIR=`pwd`/analysis
+fi
+if [ -z "$SUBSAMPLE" ]; then
+	SUBSAMPLE=0
 fi
 
 if [ $AWS == 0 ]; then
@@ -148,6 +151,7 @@ CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/bowtie2_index/contamination
 # Start Analysis
 echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
+echo "Pipeline: $VERSION"
 echo "Subsample: $SUBSAMPLE"
 echo
 
