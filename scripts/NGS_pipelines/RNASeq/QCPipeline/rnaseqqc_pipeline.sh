@@ -311,7 +311,43 @@ analysis_date_started=$(date +"%s")
 echo
 
 ##############################################################################
-# Step 1.5: Unzip if not already unzipped (this is for Galaxy)
+# Step 2: Run FastQ Validator (make sure the fastq [zip] file is valid)
+##############################################################################
+if [ ! -e $SAMPLE.fq1Validator.txt ]
+then
+	echo "Validating forward reads ($FASTQ1)"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ1 > $SAMPLE.fq1Validator.txt
+
+	if [ $? -ne 0 ]
+	then
+		echo "$FASTQ1 is not valid"
+		rm $SAMPLE.fq1Validator.txt
+		exit -1
+	fi
+fi
+
+if [ -n "$FASTQ2" ] && [ ! -e $SAMPLE.fq2Validator.txt ]
+then
+        echo "Validating reverse reads ($FASTQ2)"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
+	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ2 > $SAMPLE.fq2Validator.txt
+
+        if [ $? -ne 0 ]
+        then
+                echo "$FASTQ2 is not valid"
+		rm $SAMPLE.fq2Validator.txt
+                exit -1
+        fi
+
+fi
+
+##############################################################################
+# Step 2.5: Unzip if not already unzipped (this is for Galaxy)
 ##############################################################################
 if [ ! -e ${SAMPLE}_1.fastq ]; then
 	if [ $(file $FASTQ1 | cut -d' ' -f2) == "gzip" ]; then
@@ -358,42 +394,6 @@ if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
 
 		ln -s $FASTQ ${SAMPLE}_1.fastq
 	fi
-fi
-
-##############################################################################
-# Step 2: Run FastQ Validator
-##############################################################################
-if [ ! -e $SAMPLE.fq1Validator.txt ]
-then
-	echo "Validating forward reads ($FASTQ1)"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
-
-	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ1 > $SAMPLE.fq1Validator.txt
-
-	if [ $? -ne 0 ]
-	then
-		echo "$FASTQ1 is not valid"
-		rm $SAMPLE.fq1Validator.txt
-		exit -1
-	fi
-fi
-
-if [ -n "$FASTQ2" ] && [ ! -e $SAMPLE.fq2Validator.txt ]
-then
-        echo "Validating reverse reads ($FASTQ2)"
-        date '+%m/%d/%y %H:%M:%S'
-        echo
-
-	$FASTQVALIDATOR --disableSeqIDCheck --file $FASTQ2 > $SAMPLE.fq2Validator.txt
-
-        if [ $? -ne 0 ]
-        then
-                echo "$FASTQ2 is not valid"
-		rm $SAMPLE.fq2Validator.txt
-                exit -1
-        fi
-
 fi
 
 ##############################################################################
