@@ -655,12 +655,10 @@ fi
 ##############################################################################
 # 12. Cleanup intermediate output
 ##############################################################################
-if [ $AWS == 1 ]
-then
-	rm $FASTQ1 $FASTQ2
-fi
-rm *.uncontaminated.fastq.?.gz
-#rm -rf *.fastq tophat_out/ $SAMPLE.ba? 
+#if [ $AWS == 1 ]
+#then
+#fi
+rm *.gz *.fastq snappy-1.0.33-libsnappyjava.so
 
 ##############################################################################
 # 13.  Transfer data to final resting place
