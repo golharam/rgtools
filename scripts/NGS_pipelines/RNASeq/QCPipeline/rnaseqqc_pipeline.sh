@@ -116,12 +116,12 @@ if [ -z "$SUBSAMPLE" ]; then
 	SUBSAMPLE=0
 fi
 
-if [ $AWS == 0 ]; then
-	EXT_PKGS_DIR=/apps/sys/galaxy/external_packages
-	REFERENCE_DIR=/ng18/galaxy/reference_genomes	
-else
+if [ $AWS -eq 1 ]; then
 	EXT_PKGS_DIR=/ngs/apps
 	REFERENCE_DIR=/ngs/reference
+else
+	EXT_PKGS_DIR=/apps/sys/galaxy/external_packages
+	REFERENCE_DIR=/ng18/galaxy/reference_genomes	
 fi
 
 # Applications / Programs
@@ -315,8 +315,6 @@ echo
 ##############################################################################
 if [ ! -e ${SAMPLE}_1.fastq ]; then
 	if [ $(file $FASTQ1 | cut -d' ' -f2) == "gzip" ]; then
-		echo
-		echo
 		echo "Unzipping $FASTQ1 > ${SAMPLE}_1.fastq"
 		date '+%m/%d/%y %H:%M:%S'
 		echo
@@ -443,20 +441,20 @@ then
 		exit -1
 	fi
 
-	echo Resorting contamination BAM file
+	echo Sorting contamination BAM file
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	java -Xmx4G -jar $PICARD_JAR ReorderSam \
-		R=$REFERENCE_DIR/contamination/contamination.fa \
+	java -Xmx4G -jar $PICARD_JAR SortSam \
 		INPUT=$SAMPLE.contaminated.sam \
 		OUTPUT=$SAMPLE.contaminated.bam \
 		CREATE_INDEX=true \
+		SO=coordinate \
 		TMP_DIR=.
 
         if [ $? -ne 0 ]
         then
-                echo "Error resorting contaminated bam file"
+                echo "Error sorting contamination bam file"
                 $SAMPLE.contaminated.bam
                 exit -1
         fi
@@ -473,6 +471,7 @@ fi
 ##############################################################################
 if [ "$SUBSAMPLE" -ne "0" ]; then
 	if [ ! -e ${SAMPLE}_1.subsampled.fastq ]; then
+		echo
 		echo "Subsampling for $SUBSAMPLE reads..."
 		date '+%m/%d/%y %H:%M:%S'
 		echo
@@ -495,6 +494,7 @@ if [ "$SUBSAMPLE" -ne "0" ]; then
 		fi
 	fi
 else
+	echo
 	echo "Not subsampling...using entire set of reads..."
 	echo
 	# Nothing to do here since we've got the uncontaminated set of reads in
@@ -514,7 +514,7 @@ then
 	# TBD: Output unaligned reads as well, or else CollectAlignmentMetrics thinks all the reads aligned.
 	$TOPHAT2/tophat2 -p $THREADS \
 		 --rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
-		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE $FASTQ1 FASTQ2
+		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE $FASTQ1 $FASTQ2
 
 	if [ $? -ne 0 ] && [ ! -e tophat_out/accepted_hits.bam ]
 	then
@@ -635,16 +635,18 @@ fi
 if [ ! -e ${SAMPLE}.erccMetrics.txt ]
 then
 	echo
-        echo Collecting ERCC Metrics
+        echo Collecting Index Metrics
         date '+%m/%d/%y %H:%M:%S'
         echo
 
-	$BEDTOOLS coverage -a $REFERENCE_DIR/ERCC92/ERCC92.bed -b ${SAMPLE}.bam > ${SAMPLE}.erccMetrics.txt
+	#$BEDTOOLS coverage -a $REFERENCE_DIR/ERCC92/ERCC92.bed -b ${SAMPLE}.bam > ${SAMPLE}.erccMetrics.txt
+	$SAMTOOLS idxstats ${SAMPLE}.bam > ${SAMPLE}.idxStats.txt
 	
         if [ $? -ne 0 ]
         then
-                echo "Error collecting ercc metrics"
-                cat ${SAMPLE}.erccMetrics.txt
+                echo "Error collecting index metrics:"
+                cat ${SAMPLE}.idxStats.txt
+                rm ${SAMPLE}.idxStats.txt
                 exit -1
         fi
 
@@ -657,6 +659,7 @@ if [ $AWS == 1 ]
 then
 	rm $FASTQ1 $FASTQ2
 fi
+rm *.uncontaminated.fastq.?.gz
 #rm -rf *.fastq tophat_out/ $SAMPLE.ba? 
 
 ##############################################################################
@@ -669,8 +672,8 @@ then
 	mv ${SAMPLE_DIR} ${OUTDIR}/${SAMPLE}
 else
 	# TBD: This is project specific and needs to be parameterized
-	#aws s3 cp --recursive $SAMPLE_DIR s3://bmsrd-ngs-M2GEN/
-	scp -r $SAMPLE_DIR golharr@kraken.pri.bms.com:/home/golharr/ngsprojects/M2GEN-TCGA/analysis/${SAMPLE}
+	aws s3 cp --recursive $SAMPLE_DIR s3://bmsrd-ngs-M2GEN/${SAMPLE}
+	#scp -r $SAMPLE_DIR golharr@kraken.pri.bms.com:/home/golharr/ngsprojects/M2GEN-TCGA/analysis/${SAMPLE}
 	
 	if [ $? -ne 0 ]
 	then
