@@ -9,7 +9,7 @@
 # Set default values.  These can be set via command-line options only.  
 # Setting them here overrides environment variables
 ###############################################################################
-VERSION=0.3
+VERSION=0.5.3b
 HELP=0
 DELETE_INTERMEDIATE=0
 THREADS=8
@@ -34,15 +34,6 @@ while [[ $# > 0 ]]
 do
 	key="$1"
 	case $key in
-		--delete-intermediate)
-		DELETE_INTERMEDIATE=1
-		;;
-
-		-s|--sample)
-		SAMPLE="$2"
-		shift # past argument
-		;;
-
 		-1|--fastq1)
 		FASTQ1="$2"
 		shift # past argument
@@ -53,23 +44,12 @@ do
 		shift # past argument
 		;;
 
-		-t|--threads)
-		THREADS="$2"
-		shift # past argument
-		;;
-
 		-a|--aws)
 		AWS=1
 		;;
 
-		--sraftp)
-		SRAFTP="$2"
-		shift # past argument
-		;;
-
-		--subsample)
-		SUBSAMPLE="$2"
-		shift # past argument
+		--delete-intermediate)
+		DELETE_INTERMEDIATE=1
 		;;
 
 		-h|--help)
@@ -81,6 +61,35 @@ do
 		shift # past argument
 		;;
 
+		-s|--sample)
+		SAMPLE="$2"
+		shift # past argument
+		;;
+
+		--sample-dir)
+		SAMPLE_DIR="$2"
+		shift # past argument
+		;;
+
+		--sraftp)
+		SRAFTP="$2"
+		shift # past argument
+		;;
+
+		--subsample)
+		SUBSAMPLE="$2"
+		shift # past argument
+		;;
+		
+		-t|--threads)
+		THREADS="$2"
+		shift # past argument
+		;;
+
+		--use-star)
+		USE_STAR=1
+		;;
+		
 		*)
 		echo "Unknown option: $key"
 		exit -1
@@ -99,9 +108,11 @@ if [ $HELP == 1 ]; then
 	echo "	-a|--aws"
 	echo "  --delete-intermediate (delete intermediate files, not including source fq.gz) (not yet implemented)"
 	echo "	-h|--help"
+	echo "  -o|--outdir <output directory> [default=current working directory/analysis]"
+	echo "  --sample-dir (consistently use same tmp dir, for debugging"
 	echo "  --subsample [# of reads]"
 	echo "  -t|--threads"
-	echo "  -o|--outdir <output directory> [default=current working directory]"
+	echo "  --use-star"
 	exit 0
 fi
 
@@ -111,6 +122,9 @@ if [ -z "$AWS" ]; then
 fi
 if [ -z "$OUTDIR" ]; then
 	OUTDIR=`pwd`/analysis
+fi
+if [ -z "$USE_STAR" ]; then
+	USE_STAR=0
 fi
 if [ -z "$SUBSAMPLE" ]; then
 	SUBSAMPLE=0
@@ -132,21 +146,25 @@ FASTQVALIDATOR=$EXT_PKGS_DIR/fastQValidator-0.1.1a/bin/fastQValidator
 MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multithreads_12_07/bin
 #MAPSPLICE_DIR=$EXT_PKGS_DIR/MapSplice_multi_threads_2.0.1.9/bin
 PICARD_JAR=$EXT_PKGS_DIR/picard-tools-1.137/picard.jar
-R=/ngs/apps/R-3.2.2/bin/
+R_DIR=$EXT_PKGS_DIR/R-3.2.2/bin
 RGTOOLS_DIR=$EXT_PKGS_DIR/rgtools
 #RSEM_DIR=$EXT_PKGS_DIR/rsem-1.1.13
 RSEM_DIR=$EXT_PKGS_DIR/RSEM-1.2.20
 SAMTOOLS=$EXT_PKGS_DIR/samtools-0.1.19/samtools
 SRA_DIR=$EXT_PKGS_DIR/sratoolkit-2.5.2/bin
+STAR=$EXT_PKGS_DIR/STAR-STAR_2.4.2a/bin/Linux_x86_64_static/STAR
 TMP_DIR=/scratch
 TOPHAT2=$EXT_PKGS_DIR/tophat-2.1.0/
 UBU_DIR=$EXT_PKGS_DIR/ubu
 UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
 
-export PATH=$BOWTIE2:$R:$TOPHAT2:$PATH
+export PATH=$BOWTIE2:$R_DIR:$TOPHAT2:$PATH
 
 # Reference data
-CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/bowtie2_index/contamination
+CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/contamination.fa
+CONTAMINATION_REFERENCE_BOWTIE2=$REFERENCE_DIR/contamination/bowtie2_index/contamination
+CONTAMINATION_REFERENCE_STAR=$REFERENCE_DIR/contamination/STAR_index
+REFERENCE_STAR=$REFERENCE_DIR/hg19ERCC/STAR_index
 
 # Start Analysis
 echo "Processing $SAMPLE"
@@ -173,9 +191,11 @@ echo
 
 ##############################################################################
 # Step 1: Download the file to the local scratch space
-# If SRA, download from SRA
-# If FTP, download from FTP
-# If on AWS, copy data from kraken
+# If SRA, download from SRA -> [${SAMPLE}_1.fastq.gz, ${SAMPLE}_2.fastq.gz]
+# If FTP, download from FTP -> [${SAMPLE}_1.fastq.gz, ${SAMPLE}_2.fastq.gz]
+# If AWS, copy  from kraken -> [${SAMPLE}_1.fastq.gz, ${SAMPLE}_2.fastq.gz]
+# Else assume file is local and unknown if compressed or not.  
+# Regardless, $FASTQ1 and $FASTQ2 point to the files.
 ##############################################################################
 if [ -n "$SRAFTP" ]
 then
@@ -212,11 +232,13 @@ then
 			exit -1
 		fi
 
+		# Single-end reads are extracted to ${SAMPLE}.fastq.gz
+		# Paired-end reads are in ${SAMPLE}_1/2.fastq.gz 
 		if [ ! -e ${SAMPLE}_1.fastq.gz ]
 		then
 			mv ${SAMPLE}.fastq.gz ${SAMPLE}_1.fastq.gz
 		fi
-
+		
 		rm ${SAMPLE}.sra
 		touch ${SAMPLE}.sra
 
@@ -225,10 +247,10 @@ then
         	echo
 	fi
 
-	FASTQ1=${SAMPLE}_1.fastq.gz
+	FASTQ1=`pwd`/${SAMPLE}_1.fastq.gz
 	if [ -e ${SAMPLE}_2.fastq.gz ]
 	then
-		FASTQ2=${SAMPLE}_2.fastq.gz
+		FASTQ2=`pwd`/${SAMPLE}_2.fastq.gz
 	fi
 elif [[ $FASTQ1 == ftp* ]] # If FTP location, then download from FTP
 then
@@ -242,10 +264,15 @@ then
 	if [ $? -ne 0 ]
 	then
 	        echo "Error downloading $FASTQ1"
-	        rm -f $FASTQ1 2>/dev/null
+	        rm -f $FILENAME 2>/dev/null
         	exit -1
 	fi
-	FASTQ1=$FILENAME
+	
+	if [ -e ${SAMPLE}_1.fastq.gz ]
+	then
+		mv $FILENAME ${SAMPLE}_1.fastq.gz
+	fi
+	FASTQ1=`pwd`/${SAMPLE}_1.fastq.gz
 
 	# Repeat for FastQ2
 	echo "Downloading $FASTQ2"
@@ -258,54 +285,67 @@ then
         if [ $? -ne 0 ]
         then
                 echo "Error downloading $FASTQ2"
-                rm -f $FASTQ2 2>/dev/null
+                rm -f $FILENAME 2>/dev/null
                 exit -1
         fi
-        FASTQ2=$FILENAME
+
+	if [ -e ${SAMPLE}_2.fastq.gz ]
+	then
+		mv $FILENAME ${SAMPLE}_2.fastq.gz
+	fi
+	FASTQ2=`pwd`/${SAMPLE}_2.fastq.gz
 elif [ $AWS == 1 ] # Copy the data from kraken
 then
 	echo "Downloading from kraken: $FASTQ1"
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 	
-	B=`basename $FASTQ1`
-	scp golharr@kraken.pri.bms.com:$FASTQ1 .
+	scp golharr@kraken.pri.bms.com:$FASTQ1 ./${SAMPLE}_1.fastq.gz
 	
         if [ $? -ne 0 ]
         then
                 echo "Error downloading $FASTQ1"
-                rm -f $B 2>/dev/null
+                rm -f ${SAMPLE}_1.fastq.gz 2>/dev/null
                 exit -1
         fi
-	FASTQ1=`pwd`/$B
+	FASTQ1=`pwd`/${SAMPLE}_1.fastq.gz
 	
 	echo "Downloading from kraken: $FASTQ2"
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 	
-	B=`basename $FASTQ2`
-	scp golharr@kraken.pri.bms.com:$FASTQ2 .
+	scp golharr@kraken.pri.bms.com:$FASTQ2 ./${SAMPLE}_2.fastq.gz
 	
         if [ $? -ne 0 ]
         then
                 echo "Error downloading $FASTQ2"
-                rm -f $B 2>/dev/null
+                rm -f ${SAMPLE}_2.fastq.gz 2>/dev/null
                 exit -1
         fi
-	FASTQ2=`pwd`/$B
+	FASTQ2=`pwd`/${SAMPLE}_2.fastq.gz
 fi
+# If we didn't do any of the above, then FASTQ1 and FASTQ2 are local files.
+# They are either links to the original files or are the original files.
+# In either case, make a link to them so we don't accidentially delete them.
 
+
+echo "Using Fastq file(s):"
 if [ ! -e $FASTQ1 ]
 then
 	echo "Unable to locate $FASTQ1.  Make sure full path is provided"
 	exit -1
 fi
-echo "Using Fastq file(s):"
 echo FASTQ1: $FASTQ1
 if [ -n "$FASTQ2" ]
 then
+	if [ ! -e $FASTQ2 ]
+	then
+		echo "Unable to locate $FASTQ2.  Make sure full path is provided"
+		exit -1
+	fi
 	echo FASTQ2: $FASTQ2
 fi
+
 date '+%m/%d/%y %H:%M:%S'
 analysis_date_started=$(date +"%s")
 echo
@@ -347,7 +387,8 @@ then
 fi
 
 ##############################################################################
-# Step 2.5: Unzip if not already unzipped (this is for Galaxy)
+# Step 3: Unzip if not already unzipped
+# Output [${SAMPLE}_1.fastq, ${SAMPLE}_2.fastq]
 ##############################################################################
 if [ ! -e ${SAMPLE}_1.fastq ]; then
 	if [ $(file $FASTQ1 | cut -d' ' -f2) == "gzip" ]; then
@@ -362,7 +403,6 @@ if [ ! -e ${SAMPLE}_1.fastq ]; then
 			rm ${SAMPLE}_1.fastq
 			exit -1
 		fi
-
 	else
 		echo
 		echo "$FASTQ1 is not gzip compressed:"
@@ -392,12 +432,12 @@ if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
 		echo $(file $FASTQ2)
 		echo
 
-		ln -s $FASTQ ${SAMPLE}_1.fastq
+		ln -s $FASTQ2 ${SAMPLE}_2.fastq
 	fi
 fi
 
 ##############################################################################
-# Step 3: Run FastQC
+# Step 4: Run FastQC
 ##############################################################################
 if [ ! -e "${SAMPLE}_fastqc.zip" ]
 then
@@ -416,96 +456,165 @@ then
 fi
 
 ##############################################################################
-# Step 4: Perform contamination detection
+# Step 5: Subsample (if not subsampling, link to original fastq files)
+# Output: [${SAMPLE}_1.subsampled.fastq, ${SAMPLE}_2.subsampled.fastq]
+##############################################################################
+if [ "$SUBSAMPLE" -ne "0" ]; then
+	echo
+	echo "Subsampling for $SUBSAMPLE reads..."
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	if [ -n "$FASTQ2" ]; then
+		RandomSubFq -w $SUBSAMPLE -i $FASTQ1 -i $FASTQ2 -o ${SAMPLE}_1.subsampled.fastq -o ${SAMPLE}_2.subsampled.fastq
+	else
+		RandomSubFq -w $SUBSAMPLE -i $FASTQ1 -o ${SAMPLE}_1.subsampled.fastq
+	fi
+
+	if [ $? -ne 0 ]; then
+		echo "Error subsampling"
+		rm ${SAMPLE}_?.subsampled.fastq
+		exit -1
+	fi
+
+else
+	echo "Not subsampling...using entire set of reads..."
+	echo
+	
+	ln -s ${SAMPLE}_1.fastq ${SAMPLE}_1.subsampled.fastq
+	if [ -e ${SAMPLE}_2.fastq ]; then
+		ln -s ${SAMPLE}_2.fastq ${SAMPLE}_2.subsampled.fastq
+	fi
+fi
+
+##############################################################################
+# Step 6: Perform contamination detection
+# Output -> [${SAMPLE}.uncontaminated.fastq.1.gz, ${SAMPLE}.uncontaminated.fastq.2.gz]
 ##############################################################################
 if [ ! -d contamination ]
 then
-	echo "Checking for bacterial/viral contamination"
+	echo "Checking for bacterial/viral contamination (USE_STAR=$USE_STAR)"
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
 	mkdir contamination
 	cd contamination
-	$BOWTIE2/bowtie2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
-		 --al-conc-gz $SAMPLE.contaminated.fastq.gz \
-		 -p $THREADS -1 $FASTQ1 -2 $FASTQ2 \
-		 --no-unal --rg-id $SAMPLE \
-		 --rg "SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina" \
-		 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE 2>$SAMPLE.contamination.log
-
-	if [ $? -ne 0 ]; then
-		echo "Error running bowtie2 for contamination:"
-		cat $SAMPLE.contamination.log
-		cd ..
-		rm -rf contamination
-		exit -1
-	fi
-
-	echo Sorting contamination BAM file
-	date '+%m/%d/%y %H:%M:%S'
-	echo
-
-	java -Xmx4G -jar $PICARD_JAR SortSam \
-		INPUT=$SAMPLE.contaminated.sam \
-		OUTPUT=$SAMPLE.contaminated.bam \
-		CREATE_INDEX=true \
-		SO=coordinate \
-		TMP_DIR=.
-
-        if [ $? -ne 0 ]
-        then
-                echo "Error sorting contamination bam file"
-                $SAMPLE.contaminated.bam
-                exit -1
-        fi
 	
-	rm $SAMPLE.contaminated.sam
-	mv ${SAMPLE}.uncontaminated.fastq.1.gz ../
-	mv ${SAMPLE}.uncontaminated.fastq.2.gz ../
+	if [ $USE_STAR -eq 1 ]
+	then
+		$STAR --runThreadN $THREADS --genomeDir $CONTAMINATION_REFERENCE_STAR \
+			--readFilesIn ../${SAMPLE}_1.subsampled.fastq ../${SAMPLE}_2.subsampled.fastq \
+			--outSAMtype BAM SortedByCoordinate \
+			--outReadsUnmapped Fastx \
+			--genomeLoad LoadAndKeep 
+
+		if [ $? -ne 0 ]; then
+			echo "Error running STAR for contamination:"
+			cat Log.out
+			cd ..
+			rm -rf contamination
+			exit -1
+		fi
+		
+		mv Aligned.sortedByCoord.out.bam $SAMPLE.contaminated.bam
+		$SAMTOOLS index $SAMPLE.contaminated.bam
+		mv Unmapped.out.mate1 ../${SAMPLE}_1.uncontaminated.fastq
+		mv Unmapped.out.mate2 ../${SAMPLE}_2.uncontaminated.fastq
+	else
+		$BOWTIE2/bowtie2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
+			 --al-conc-gz $SAMPLE.contaminated.fastq.gz \
+			 -p $THREADS -1 ../${SAMPLE}_1.subsampled.fastq -2 ../${SAMPLE}_2.subsampled.fastq \
+			 --no-unal --rg-id $SAMPLE \
+			 --rg "SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina" \
+			 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE_BOWTIE2 2>$SAMPLE.contamination.log
+	
+		if [ $? -ne 0 ]; then
+			echo "Error running bowtie2 for contamination:"
+			cat $SAMPLE.contamination.log
+			cd ..
+			rm -rf contamination
+			exit -1
+		fi
+
+		echo Sorting contamination BAM file
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		java -Xmx4G -jar $PICARD_JAR SortSam \
+			INPUT=$SAMPLE.contaminated.sam \
+			OUTPUT=$SAMPLE.contaminated.bam \
+			CREATE_INDEX=true \
+			SO=coordinate \
+			TMP_DIR=.
+
+		if [ $? -ne 0 ]
+		then
+			echo "Error sorting contamination bam file"
+			rm $SAMPLE.contaminated.bam
+			exit -1
+		fi
+
+		echo Collect Alignment Summary Metrics on Contamination Data
+		date '+%m/%d/%y %H:%M:%S'
+		echo
+
+		java -Xmx4G -jar $PICARD_JAR CollectAlignmentSummaryMetrics \
+			R=$CONTAMINATION_REFERENCE \
+			INPUT=$SAMPLE.contaminated.bam \
+			OUTPUT=${SAMPLE}.contaminated.alnMetrics.txt
+
+		if [ $? -ne 0 ]
+		then
+			echo "Error collecting contamination alignment summary metrics"
+			rm ${SAMPLE}.contaminated.alnMetrics.txt
+			exit -1
+		fi		
+
+		rm $SAMPLE.contaminated.sam
+		mv ${SAMPLE}.uncontaminated.fastq.1.gz ../
+		mv ${SAMPLE}.uncontaminated.fastq.2.gz ../
+	fi
 	
 	cd ..
 fi
 
 ##############################################################################
-# Step 5: Subsample
+# Step 7: Run tophat2 or STAR
 ##############################################################################
-if [ "$SUBSAMPLE" -ne "0" ]; then
-	if [ ! -e ${SAMPLE}_1.subsampled.fastq ]; then
-		echo
-		echo "Subsampling for $SUBSAMPLE reads..."
-		date '+%m/%d/%y %H:%M:%S'
-		echo
-
-		if [ -n "$FASTQ2" ]; then
-			RandomSubFq -w $SUBSAMPLE -i ${SAMPLE}_1.fastq.gz -i ${SAMPLE}_2.fastq.gz -o ${SAMPLE}_1.subsampled.fastq -o ${SAMPLE}_2.subsampled.fastq
-		else
-			RandomSubFq -w $SUBSAMPLE -i ${SAMPLE}_1.fastq.gz -o ${SAMPLE}_1.subsampled.fastq
-		fi
-
-	        if [ $? -ne 0 ]; then
-	                echo "Error subsampling"
-	                rm ${SAMPLE}_?.subsampled.fastq
-	                exit -1
-	        fi
-
-		FASTQ1=${SAMPLE}_1.subsampled.fastq
-		if [ -n "$FASTQ2" ]; then
-			FASTQ2=${SAMPLE}_2.subsampled.fastq
-		fi
-	fi
-else
-	echo
-	echo "Not subsampling...using entire set of reads..."
-	echo
-	# Nothing to do here since we've got the uncontaminated set of reads in
-	# ${SAMPLE}_1.fastq.gz and ${SAMPLE}_2.fastq.gz
-fi
-
-##############################################################################
-# Step 6: Run tophat2
-##############################################################################
-if [ ! -d tophat_out ]
+if [ $USE_STAR -eq 1 ]
 then
+	echo
+	echo Running STAR
+	date '+%m/%d/%y %H:%M:%S'
+	date1=$(date +"%s")
+	echo
+	
+	mkdir star
+	cd star
+	
+	$STAR --runThreadN $THREADS --genomeDir $REFERENCE_STAR \
+		--readFilesIn ../${SAMPLE}_1.uncontaminated.fastq ../${SAMPLE}_2.uncontaminated.fastq \
+		--outSAMtype BAM SortedByCoordinate --genomeLoad LoadAndKeep
+		
+	if [ $? -ne 0 ]; then
+		echo "Error running STAR:"
+		cat Log.out
+		cd ..
+		rm -rf star
+		exit -1
+	fi
+	
+	cd ..
+	
+	echo Finished running STAR
+	date '+%m/%d/%y %H:%M:%S'
+	date2=$(date +"%s")
+	diff=$(($date2-$date1))
+        echo "Running STAR took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
+	echo
+elif [ ! -d tophat_out ]
+then
+	echo
 	echo Running tophat2
 	date '+%m/%d/%y %H:%M:%S'
 	date1=$(date +"%s")
@@ -514,7 +623,8 @@ then
 	# TBD: Output unaligned reads as well, or else CollectAlignmentMetrics thinks all the reads aligned.
 	$TOPHAT2/tophat2 -p $THREADS \
 		 --rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
-		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE $FASTQ1 $FASTQ2
+		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE \
+		$SAMPLE.uncontaminated.fastq.1.gz $SAMPLE.uncontaminated.fastq.2.gz
 
 	if [ $? -ne 0 ] && [ ! -e tophat_out/accepted_hits.bam ]
 	then
@@ -527,7 +637,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	date2=$(date +"%s")
 	diff=$(($date2-$date1))
-        echo "Runng tophat2 took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
+        echo "Running tophat2 took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
 	echo
 fi
 
@@ -540,20 +650,26 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	java -Xmx4G -jar $PICARD_JAR ReorderSam \
-		R=$REFERENCE_DIR/$REFERENCE/$REFERENCE.fa \
-		INPUT=tophat_out/accepted_hits.bam \
-		OUTPUT=${SAMPLE}.bam \
-		CREATE_INDEX=true \
-		TMP_DIR=.
+	if [ $USE_STAR -eq 1 ]
+	then
+		mv star/Aligned.sortedByCoord.out.bam ${SAMPLE}.bam
+		$SAMTOOLS index ${SAMPLE}.bam
+	else
+		java -Xmx4G -jar $PICARD_JAR ReorderSam \
+			R=$REFERENCE_DIR/$REFERENCE/$REFERENCE.fa \
+			INPUT=tophat_out/accepted_hits.bam \
+			OUTPUT=${SAMPLE}.bam \
+			CREATE_INDEX=true \
+			TMP_DIR=.
 
-        if [ $? -ne 0 ]
-        then
-                echo "Error resorting bam file"
-                rm ${SAMPLE}.bam
-                exit -1
-        fi
-        rm tophat_out/accepted_hits.bam
+		if [ $? -ne 0 ]
+		then
+			echo "Error resorting bam file"
+			rm ${SAMPLE}.bam
+			exit -1
+		fi
+		rm tophat_out/accepted_hits.bam
+	fi	
 fi
 
 ##############################################################################
@@ -632,14 +748,13 @@ fi
 ##############################################################################
 # 11.  Collect ERCC Metrics
 ##############################################################################
-if [ ! -e ${SAMPLE}.erccMetrics.txt ]
+if [ ! -e ${SAMPLE}.idxStats.txt ]
 then
 	echo
         echo Collecting Index Metrics
         date '+%m/%d/%y %H:%M:%S'
         echo
 
-	#$BEDTOOLS coverage -a $REFERENCE_DIR/ERCC92/ERCC92.bed -b ${SAMPLE}.bam > ${SAMPLE}.erccMetrics.txt
 	$SAMTOOLS idxstats ${SAMPLE}.bam > ${SAMPLE}.idxStats.txt
 	
         if [ $? -ne 0 ]
@@ -655,16 +770,19 @@ fi
 ##############################################################################
 # 12. Cleanup intermediate output
 ##############################################################################
-#if [ $AWS == 1 ]
-#then
-#fi
-rm *.gz *.fastq snappy-1.0.33-libsnappyjava.so
+if [ $AWS -eq 1 ]
+then
+	rm *.gz
+fi
+
+# Removing *.gz files on local files 
+rm *.fastq
 
 ##############################################################################
 # 13.  Transfer data to final resting place
 ##############################################################################
 cd ..
-if [ $AWS == 0 ]
+if [ $AWS -eq 0 ]
 then
 	echo "Moving ${SAMPLE_DIR} to ${OUTDIR}/${SAMPLE}"
 	mv ${SAMPLE_DIR} ${OUTDIR}/${SAMPLE}

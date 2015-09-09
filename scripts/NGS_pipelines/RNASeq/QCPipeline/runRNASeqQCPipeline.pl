@@ -53,9 +53,9 @@ sub runSamples {
 		
 		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
 		if ($dryRun == 1) {
-			print "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2 $dirname/rnaseqqc_pipeline.sh\n";
+			print "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=1,AWS=1 $dirname/rnaseqqc_pipeline.sh\n";
 		} else {
-			$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2 $dirname/rnaseqqc_pipeline.sh`;
+			$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=1,AWS=1 $dirname/rnaseqqc_pipeline.sh`;
 			$_ =~ m/Your job (\d+)/;
 			if (!defined($1)) {
 				print STDERR "\nUnable to determine job ID: $_";
