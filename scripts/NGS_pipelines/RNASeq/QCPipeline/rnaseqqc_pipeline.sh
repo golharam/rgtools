@@ -171,6 +171,7 @@ echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
 echo "Pipeline: $VERSION"
 echo "Subsample: $SUBSAMPLE"
+echo "AWS: $AWS"
 echo
 
 # Make tmp working directory aka SAMPLE_DIR
@@ -294,7 +295,7 @@ then
 		mv $FILENAME ${SAMPLE}_2.fastq.gz
 	fi
 	FASTQ2=`pwd`/${SAMPLE}_2.fastq.gz
-elif [ $AWS == 1 ] # Copy the data from kraken
+elif [ $AWS -eq 1 ] # Copy the data from kraken
 then
 	echo "Downloading from kraken: $FASTQ1"
 	date '+%m/%d/%y %H:%M:%S'
