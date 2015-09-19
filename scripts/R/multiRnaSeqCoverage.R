@@ -5,14 +5,14 @@
 
 # Parse the arguments
 args <- commandArgs(trailing = TRUE)
-metricsFiles  <- args[1]
-outputFile   <- args[2]
-
-# Count how many metricsFiles and bamNames we have and make sure they match
-metricsFilesArray <- unlist(strsplit(metricsFiles, ","))
+metricsFiles <- vector(mode="character", length=length(args)-1)
+for (i in 1:length(args)-1) {
+  metricsFiles[i]  <- args[i]
+}
+outputFile   <- args[length(args)] # Get the last argument as the output file
 
 # Figure out where the metrics and the histogram are in the first file and parse them out
-startFinder <- scan(metricsFilesArray[1], what="character", sep="\n", quiet=TRUE, blank.lines.skip=FALSE)
+startFinder <- scan(metricsFiles[1], what="character", sep="\n", quiet=TRUE, blank.lines.skip=FALSE)
 
 firstBlankLine=0
 
@@ -27,7 +27,7 @@ for (i in 1:length(startFinder)) {
         }
 }
 
-data <- read.table(metricsFilesArray[1], header=T, sep="\t", skip=secondBlankLine, check.names=FALSE)
+data <- read.table(metricsFiles[1], header=T, sep="\t", skip=secondBlankLine, check.names=FALSE)
 
 # The histogram has a normalized_position and normalized_coverage column for each metric "level"
 # This code parses out the distinct levels so we can output one graph per level
@@ -44,8 +44,8 @@ if (any(duplicated(headers))) {
 # Read in the metrics for the rest of the samples
 sampleMetrics <- data
 
-for (i in 2:length(metricsFilesArray)) {
-    data <- read.table(metricsFilesArray[i], header=T, sep="\t", skip=secondBlankLine, check.names=FALSE)
+for (i in 2:length(metricsFiles)) {
+    data <- read.table(metricsFiles[i], header=T, sep="\t", skip=secondBlankLine, check.names=FALSE)
     sampleMetrics[i+1] <- data[2]
 }
 
@@ -63,7 +63,9 @@ for (i in 2:length(headers)) {
 # Some constants that are used below
 COLORS = c("royalblue", "#FFAAAA", "palegreen3");
 
-pdf(outputFile)
+#pdf(outputFile)
+png(outputFile)
+
 # For each level, plot of the normalized coverage by GC
 for (i in 1:length(levels)) {
 
@@ -88,4 +90,8 @@ for (i in 1:length(levels)) {
     }
     
 }
+
+# redraw the first sample in a different color (because its a good sample)
+lines(x=sampleMetrics$normalized_position, y=as.matrix(sampleMetrics[2]), type='o', col="red")
+
 dev.off()

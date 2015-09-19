@@ -9,11 +9,10 @@
 # Set default values.  These can be set via command-line options only.  
 # Setting them here overrides environment variables
 ###############################################################################
-VERSION=0.5.3b
+VERSION=0.5.3d
 HELP=0
 DELETE_INTERMEDIATE=0
 THREADS=8
-REFERENCE=hg19ERCC
 
 if [ $# -eq 0 ]
 then
@@ -81,6 +80,11 @@ do
 		shift # past argument
 		;;
 		
+		--tmpdir)
+		TMP_DIR="$2"
+		shift # past argument
+		;;
+
 		-t|--threads)
 		THREADS="$2"
 		shift # past argument
@@ -123,11 +127,14 @@ fi
 if [ -z "$OUTDIR" ]; then
 	OUTDIR=`pwd`/analysis
 fi
-if [ -z "$USE_STAR" ]; then
-	USE_STAR=0
-fi
 if [ -z "$SUBSAMPLE" ]; then
 	SUBSAMPLE=0
+fi
+if [ -z "$TMP_DIR" ]; then
+	TMP_DIR=/scratch
+fi
+if [ -z "$USE_STAR" ]; then
+	USE_STAR=0
 fi
 
 if [ $AWS -eq 1 ]; then
@@ -153,7 +160,6 @@ RSEM_DIR=$EXT_PKGS_DIR/RSEM-1.2.20
 SAMTOOLS=$EXT_PKGS_DIR/samtools-0.1.19/samtools
 SRA_DIR=$EXT_PKGS_DIR/sratoolkit-2.5.2/bin
 STAR=$EXT_PKGS_DIR/STAR-STAR_2.4.2a/bin/Linux_x86_64_static/STAR
-TMP_DIR=/scratch
 TOPHAT2=$EXT_PKGS_DIR/tophat-2.1.0/
 UBU_DIR=$EXT_PKGS_DIR/ubu
 UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
@@ -161,6 +167,7 @@ UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
 export PATH=$BOWTIE2:$R_DIR:$TOPHAT2:$PATH
 
 # Reference data
+REFERENCE=hg19ERCC
 CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/contamination.fa
 CONTAMINATION_REFERENCE_BOWTIE2=$REFERENCE_DIR/contamination/bowtie2_index/contamination
 CONTAMINATION_REFERENCE_STAR=$REFERENCE_DIR/contamination/STAR_index
@@ -171,6 +178,7 @@ echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
 echo "Pipeline: $VERSION"
 echo "Subsample: $SUBSAMPLE"
+echo "TmpDir: $TMP_DIR"
 echo "AWS: $AWS"
 echo
 
@@ -438,26 +446,7 @@ if [ -n "$FASTQ2" ] && [ ! -e ${SAMPLE}_2.fastq ]; then
 fi
 
 ##############################################################################
-# Step 4: Run FastQC
-##############################################################################
-if [ ! -e "${SAMPLE}_fastqc.zip" ]
-then
-	echo "Running FastQC"
-	date '+%m/%d/%y %H:%M:%S'
-	echo
-
-	$FASTQC --quiet --outdir=. --extract -t 2 $FASTQ1 $FASTQ2
-
-	if [ $? -ne 0 ]
-	then
-		echo "Error running FastQC"
-		rm -rf *_fastqc *_fastqc.zip *_fastqc.html
-	        exit -1
-	fi
-fi
-
-##############################################################################
-# Step 5: Subsample (if not subsampling, link to original fastq files)
+# Step 4: Subsample (if not subsampling, link to original fastq files)
 # Output: [${SAMPLE}_1.subsampled.fastq, ${SAMPLE}_2.subsampled.fastq]
 ##############################################################################
 if [ "$SUBSAMPLE" -ne "0" ]; then
@@ -485,6 +474,25 @@ else
 	ln -s ${SAMPLE}_1.fastq ${SAMPLE}_1.subsampled.fastq
 	if [ -e ${SAMPLE}_2.fastq ]; then
 		ln -s ${SAMPLE}_2.fastq ${SAMPLE}_2.subsampled.fastq
+	fi
+fi
+
+##############################################################################
+# Step 5: Run FastQC
+##############################################################################
+if [ ! -e "${SAMPLE}_fastqc.zip" ]
+then
+	echo "Running FastQC"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	$FASTQC --quiet --outdir=. --extract -t 2 ${SAMPLE}_1.subsampled.fastq ${SAMPLE}_2.subsampled.fastq 
+
+	if [ $? -ne 0 ]
+	then
+		echo "Error running FastQC"
+		rm -rf *_fastqc *_fastqc.zip *_fastqc.html
+	        exit -1
 	fi
 fi
 
@@ -741,6 +749,29 @@ then
         then
                 echo "Error collecting rnaseq metrics"
                 rm ${SAMPLE}.rnaseq*
+                exit -1
+        fi
+
+fi
+
+##############################################################################
+# 10b.  Collect RNA Seq Metrics for hemoglobin
+##############################################################################
+if [ ! -e ${SAMPLE}.hemoglobinMetrics.txt ]
+then
+        echo "Collecting Hemoglobin Metrics"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
+
+	java -Xmx4G -jar $RGTOOLS_DIR/CalculateTargetRegionCoverage.jar \
+                B=${SAMPLE}.bam \
+		BED=$REFERENCE_DIR/$REFERENCE/annotation/refSeq/hemoglobin.bed \
+		OUTPUT=$SAMPLE.hemoglobinMetrics.txt
+
+        if [ $? -ne 0 ]
+        then
+                echo "Error collecting hemoglobin metrics"
+                rm ${SAMPLE}.hemoglobinMetrics*
                 exit -1
         fi
 

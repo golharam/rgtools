@@ -4,9 +4,9 @@ use warnings;
 
 use File::Basename;
 
-my $VERSION = "0.5.3b";
+my $VERSION = "0.5.3d";
 
-my $dryRun = 1;
+my $dryRun = 0;
 my %SAMPLES;
 
 sub readSamples {
@@ -38,6 +38,7 @@ sub readSamples {
 sub runSamples {
 	# Get the directory of where this script is.  
 	my $dirname = dirname(__FILE__);
+	my ($subsample, $tmpdir) = @_;
 
 	for my $sampleName (sort keys %SAMPLES) {
 		next if (-d $sampleName);
@@ -45,9 +46,9 @@ sub runSamples {
 		
 		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
 		if ($dryRun == 1) {
-			print "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=1,AWS=1 $dirname/rnaseqqc_pipeline.sh\n";
+			print "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir $dirname/rnaseqqc_pipeline.sh\n";
 		} else {
-			$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=1,AWS=1 $dirname/rnaseqqc_pipeline.sh`;
+			$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir $dirname/rnaseqqc_pipeline.sh`;
 			$_ =~ m/Your job (\d+)/;
 			if (!defined($1)) {
 				print STDERR "\nUnable to determine job ID: $_";
@@ -94,6 +95,7 @@ sub collectAndPrintMetrics {
 	my @PICARD_ALNMETRICS = ('MEAN_READ_LENGTH', 'PF_NOISE_READS', 'PF_READS_ALIGNED', 'PF_ALIGNED_BASES', 'PF_HQ_ALIGNED_READS', 'PF_HQ_ALIGNED_BASES', 'PF_HQ_ALIGNED_Q20_BASES', 'PF_HQ_MEDIAN_MISMATCHES', 'PF_MISMATCH_RATE', 'PF_HQ_ERROR_RATE', 'PF_INDEL_RATE', 'READS_ALIGNED_IN_PAIRS', 'PCT_READS_ALIGNED_IN_PAIRS', 'BAD_CYCLES', 'STRAND_BALANCE', 'PCT_CHIMERAS', 'PCT_ADAPTER');
 	my @PICARD_INSERTSIZEMETRICS = ('MEDIAN_INSERT_SIZE', 'MEDIAN_ABSOLUTE_DEVIATION', 'MIN_INSERT_SIZE', 'MAX_INSERT_SIZE', 'MEAN_INSERT_SIZE', 'STANDARD_DEVIATION', 'READ_PAIRS', 'PAIR_ORIENTATION');
 	my @PICARD_RNASEQMETRICS = ('PF_BASES', 'PF_ALIGNED_BASES', 'RIBOSOMAL_BASES', 'CODING_BASES', 'UTR_BASES', 'INTRONIC_BASES', 'INTERGENIC_BASES', 'IGNORED_READS', 'CORRECT_STRAND_READS', 'INCORRECT_STRAND_READS', 'PCT_RIBOSOMAL_BASES', 'PCT_CODING_BASES', 'PCT_UTR_BASES', 'PCT_INTRONIC_BASES', 'PCT_INTERGENIC_BASES', 'PCT_MRNA_BASES', 'PCT_USABLE_BASES', 'PCT_CORRECT_STRAND_READS', 'MEDIAN_CV_COVERAGE', 'MEDIAN_5PRIME_BIAS', 'MEDIAN_3PRIME_BIAS', 'MEDIAN_5PRIME_TO_3PRIME_BIAS');
+	my @HEMOGLOBIN_METRICS = ('HemogloginMappedReads');
 	my @ERCC_METRICS = ('ERCC-00002','ERCC-00003','ERCC-00004','ERCC-00009','ERCC-00012','ERCC-00013','ERCC-00014','ERCC-00016','ERCC-00017','ERCC-00019','ERCC-00022','ERCC-00024','ERCC-00025','ERCC-00028','ERCC-00031',
 			    'ERCC-00033','ERCC-00034','ERCC-00035','ERCC-00039','ERCC-00040','ERCC-00041','ERCC-00042','ERCC-00043','ERCC-00044','ERCC-00046','ERCC-00048','ERCC-00051','ERCC-00053','ERCC-00054','ERCC-00057',
 			    'ERCC-00058','ERCC-00059','ERCC-00060','ERCC-00061','ERCC-00062','ERCC-00067','ERCC-00069','ERCC-00071','ERCC-00073','ERCC-00074','ERCC-00075','ERCC-00076','ERCC-00077','ERCC-00078','ERCC-00079',
@@ -106,11 +108,12 @@ sub collectAndPrintMetrics {
 	open(QC, ">qcMetrics.txt") || die "Unable to open qcMetrics.txt";
 
 	# Print header line
-	for my $fields (@FASTQVALIDATOR_METRICS, @FASTQC_METRICS, @CONTAMINATION_HEADER, @PICARD_ALNMETRICS, @PICARD_INSERTSIZEMETRICS, @PICARD_RNASEQMETRICS, @ERCC_METRICS) {
+	for my $fields (@FASTQVALIDATOR_METRICS, @FASTQC_METRICS, @CONTAMINATION_HEADER, 
+			@PICARD_ALNMETRICS, @PICARD_INSERTSIZEMETRICS, @PICARD_RNASEQMETRICS, 
+			@HEMOGLOBIN_METRICS, @ERCC_METRICS) {
 		print QC "\t$fields";
 	}
 	print QC "\n";
-
 
 	for my $sampleName (sort keys %SAMPLES) {
 		my @data;
@@ -252,6 +255,15 @@ sub collectAndPrintMetrics {
 			}
 		}
 
+		# Collect Hemoglobin Metrics
+		open(F, "<analysis/$sampleName/$sampleName.hemoglobinMetrics.txt") || die "Unable to open analysis/$sampleName/$sampleName.hemoglobinMetrics.txt";
+		@data = <F>;
+		close(F);
+		chomp(@data);
+		$data[4] =~ m/(\d+)$/;
+		$SAMPLES{$sampleName}{'hemoglobin'}{'HemogloginMappedReads'} = $1;
+		print QC "\t$1";
+		
 		# Collect ERCC Metrics
 		# $SAMPLE.erccMetrics.txt has the format:
 		# chr
@@ -284,13 +296,30 @@ sub collectAndPrintMetrics {
 
 
 sub main {
-	if (scalar(@ARGV) != 1) {
-		print STDERR "Usage: $0 <samples.txt>\n";
+	my $subsample = 0;
+	my $file = '';
+	my $tmpdir = '/scratch';
+
+	if (scalar(@ARGV) == 3) {
+		$subsample = $ARGV[0];
+		$tmpdir = $ARGV[1];
+		$file = $ARGV[2];
+		
+	}
+	elsif (scalar(@ARGV) == 2) {
+		$subsample = $ARGV[0];
+		$file = $ARGV[1];
+	}
+	elsif (scalar(@ARGV) == 1) {
+		$file = $ARGV[0];
+	}
+	else {
+		print STDERR "Usage: $0 [subsample] [tmpdir] <samples.txt>\n";
 		exit(-1);
 	}
 
-	readSamples($ARGV[0]);
-	runSamples();
+	readSamples($file);
+	runSamples($subsample, $tmpdir);
 	waitForSamples();
 	collectAndPrintMetrics();
 }
