@@ -292,6 +292,14 @@ sub collectAndPrintMetrics {
 		print QC "\n";
 	}
 	close(QC);
+
+	# Generate RNA-Seq QC Plot
+	#my @METRICFILES;
+	#for my $sampleName (sort keys %SAMPLES) {
+	#	push @METRICSFILES, "analysis/$sampleName/$sampleName.rnaseqMetrics.txt";
+	#}
+	#$_ = join(" ", @METRICFILES);
+	#`Rscript $dirname/multiRnaSeqCoverage.R $_ analysis/rnaseq.txt analysis/rnaseq.png`;
 }
 
 
