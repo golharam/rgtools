@@ -33,6 +33,14 @@ while [[ $# > 0 ]]
 do
 	key="$1"
 	case $key in
+		-a|--aws)
+		AWS=1
+		;;
+
+		--delete-intermediate)
+		DELETE_INTERMEDIATE=1
+		;;
+
 		-1|--fastq1)
 		FASTQ1="$2"
 		shift # past argument
@@ -41,14 +49,6 @@ do
 		-2|--fastq2)
 		FASTQ2="$2"
 		shift # past argument
-		;;
-
-		-a|--aws)
-		AWS=1
-		;;
-
-		--delete-intermediate)
-		DELETE_INTERMEDIATE=1
 		;;
 
 		-h|--help)
@@ -70,6 +70,11 @@ do
 		shift # past argument
 		;;
 
+		--reference)
+		REFERENCE="$2"
+		shift # past argument
+		;;
+		
 		--sraftp)
 		SRAFTP="$2"
 		shift # past argument
@@ -130,6 +135,9 @@ fi
 if [ -z "$SUBSAMPLE" ]; then
 	SUBSAMPLE=0
 fi
+if [ -z "$REFERENCE" ]; then
+	REFERENCE=hg19ERCC
+fi
 if [ -z "$TMP_DIR" ]; then
 	TMP_DIR=/scratch
 fi
@@ -167,11 +175,10 @@ UBU_JAR=$EXT_PKGS_DIR/ubu-1.2-jar-with-dependencies.jar
 export PATH=$BOWTIE2:$R_DIR:$TOPHAT2:$PATH
 
 # Reference data
-REFERENCE=hg19ERCC
 CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/contamination.fa
 CONTAMINATION_REFERENCE_BOWTIE2=$REFERENCE_DIR/contamination/bowtie2_index/contamination
 CONTAMINATION_REFERENCE_STAR=$REFERENCE_DIR/contamination/STAR_index
-REFERENCE_STAR=$REFERENCE_DIR/hg19ERCC/STAR_index
+REFERENCE_STAR=$REFERENCE_DIR/$REFERENCE/STAR_index
 
 # Start Analysis
 echo "Processing $SAMPLE"

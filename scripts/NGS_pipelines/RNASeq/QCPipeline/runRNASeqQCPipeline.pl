@@ -38,7 +38,7 @@ sub readSamples {
 sub runSamples {
 	# Get the directory of where this script is.  
 	my $dirname = dirname(__FILE__);
-	my ($subsample, $tmpdir) = @_;
+	my ($subsample, $species, $tmpdir) = @_;
 
 	for my $sampleName (sort keys %SAMPLES) {
 		next if (-d $sampleName);
@@ -46,9 +46,9 @@ sub runSamples {
 		
 		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
 		if ($dryRun == 1) {
-			print "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir $dirname/rnaseqqc_pipeline.sh\n";
+			print "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFERENCE=$species $dirname/rnaseqqc_pipeline.sh\n";
 		} else {
-			$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir $dirname/rnaseqqc_pipeline.sh`;
+			$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFERENCE=$species $dirname/rnaseqqc_pipeline.sh`;
 			$_ =~ m/Your job (\d+)/;
 			if (!defined($1)) {
 				print STDERR "\nUnable to determine job ID: $_";
@@ -305,29 +305,22 @@ sub collectAndPrintMetrics {
 
 sub main {
 	my $subsample = 0;
-	my $file = '';
+	my $species = 'hg19ERCC';
 	my $tmpdir = '/scratch';
+	my $file = '';
 
-	if (scalar(@ARGV) == 3) {
+	if (scalar(@ARGV) == 4) {
 		$subsample = $ARGV[0];
-		$tmpdir = $ARGV[1];
-		$file = $ARGV[2];
-		
-	}
-	elsif (scalar(@ARGV) == 2) {
-		$subsample = $ARGV[0];
-		$file = $ARGV[1];
-	}
-	elsif (scalar(@ARGV) == 1) {
-		$file = $ARGV[0];
-	}
+		$species = $ARGV[1];
+		$tmpdir = $ARGV[2];
+		$file = $ARGV[3];
 	else {
-		print STDERR "Usage: $0 [subsample] [tmpdir] <samples.txt>\n";
+		print STDERR "Usage: $0 <subsample> <species> <tmpdir> <samples.txt>\n";
 		exit(-1);
 	}
 
 	readSamples($file);
-	runSamples($subsample, $tmpdir);
+	runSamples($subsample, $species, $tmpdir);
 	waitForSamples();
 	collectAndPrintMetrics();
 }
