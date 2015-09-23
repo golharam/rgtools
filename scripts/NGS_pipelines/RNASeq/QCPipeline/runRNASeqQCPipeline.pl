@@ -4,7 +4,7 @@ use warnings;
 
 use File::Basename;
 
-my $VERSION = "0.5.3d";
+my $VERSION = "0.5.3e";
 
 my $dryRun = 0;
 my %SAMPLES;
@@ -45,10 +45,11 @@ sub runSamples {
 		print STDERR "Submitting $sampleName...\n";
 		
 		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
+		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFERENCE=$species $dirname/rnaseqqc_pipeline.sh";
 		if ($dryRun == 1) {
-			print "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFERENCE=$species $dirname/rnaseqqc_pipeline.sh\n";
+			print "$qsubCommand\n";
 		} else {
-			$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFERENCE=$species $dirname/rnaseqqc_pipeline.sh`;
+			$_ = `$qsubCommand`;
 			$_ =~ m/Your job (\d+)/;
 			if (!defined($1)) {
 				print STDERR "\nUnable to determine job ID: $_";

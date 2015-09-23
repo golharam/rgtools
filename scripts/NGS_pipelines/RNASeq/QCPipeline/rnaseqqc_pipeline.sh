@@ -9,7 +9,7 @@
 # Set default values.  These can be set via command-line options only.  
 # Setting them here overrides environment variables
 ###############################################################################
-VERSION=0.5.3d
+VERSION=0.5.3e
 HELP=0
 DELETE_INTERMEDIATE=0
 THREADS=8
