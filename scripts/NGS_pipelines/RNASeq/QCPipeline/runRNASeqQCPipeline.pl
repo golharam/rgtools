@@ -315,7 +315,7 @@ sub main {
 		$species = $ARGV[1];
 		$tmpdir = $ARGV[2];
 		$file = $ARGV[3];
-	else {
+	} else {
 		print STDERR "Usage: $0 <subsample> <species> <tmpdir> <samples.txt>\n";
 		exit(-1);
 	}
