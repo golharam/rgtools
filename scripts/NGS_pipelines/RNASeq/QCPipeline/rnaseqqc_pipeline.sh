@@ -9,7 +9,7 @@
 # Set default values.  These can be set via command-line options only.  
 # Setting them here overrides environment variables
 ###############################################################################
-VERSION=0.5.3e
+VERSION=0.5.3g
 HELP=0
 DELETE_INTERMEDIATE=0
 THREADS=8
@@ -462,10 +462,12 @@ if [ "$SUBSAMPLE" -ne "0" ]; then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
+	NUMSEQS=`head -n 1 $SAMPLE.fq1Validator.txt | cut -f 8 -d ' '`
+	echo "Sample has $NUMSEQS sequences"
 	if [ -n "$FASTQ2" ]; then
-		RandomSubFq -w $SUBSAMPLE -i $FASTQ1 -i $FASTQ2 -o ${SAMPLE}_1.subsampled.fastq -o ${SAMPLE}_2.subsampled.fastq
+		RandomSubFq -t $NUMSEQS -w $SUBSAMPLE -i $FASTQ1 -i $FASTQ2 -o ${SAMPLE}_1.subsampled.fastq -o ${SAMPLE}_2.subsampled.fastq
 	else
-		RandomSubFq -w $SUBSAMPLE -i $FASTQ1 -o ${SAMPLE}_1.subsampled.fastq
+		RandomSubFq -t $NUMSEQS -w $SUBSAMPLE -i $FASTQ1 -o ${SAMPLE}_1.subsampled.fastq
 	fi
 
 	if [ $? -ne 0 ]; then
