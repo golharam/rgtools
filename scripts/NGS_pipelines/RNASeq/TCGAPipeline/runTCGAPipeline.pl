@@ -20,8 +20,6 @@ sub readSamples {
 			exit(-1);
 		}
 		my ($sampleName, $fq1, $fq2) = @fields;
-		next if $sampleName =~ m/^#/;
-
 		# Make sure sample isn't already defined
 		if (defined($SAMPLES{$sampleName})) {
 			print STDERR "\n$sampleName already defined.\n";
@@ -37,21 +35,20 @@ sub readSamples {
 sub runSamples {
 	# Get the directory of where this script is.  
 	my $dirname = dirname(__FILE__);
+	my ($tmpdir) = @_;
 
 	for my $sampleName (sort keys %SAMPLES) {
-		if (! -e "$sampleName/$sampleName.rsem.genes.results") {
-			print STDERR "Submitting $sampleName...";
+		print STDERR "Submitting $sampleName...";
 		
-			my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
-			$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2 $dirname/unc_rnaseqV2_pipeline.v2.sh`;
-			$_ =~ m/Your job (\d+)/;
-			if (!defined($1)) {
-				print STDERR "\nUnable to determine job ID: $_";
-				exit(-1);
-			}
-			$SAMPLES{$sampleName}{'job'} = $1;
-			print STDERR "$1\n";
+		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
+		$_ = `qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,TMP_DIR=$tmpdir $dirname/unc_rnaseqV2_pipeline.v2.sh`;
+		$_ =~ m/Your job (\d+)/;
+		if (!defined($1)) {
+			print STDERR "\nUnable to determine job ID: $_";
+			exit(-1);
 		}
+		$SAMPLES{$sampleName}{'job'} = $1;
+		print STDERR "$1\n";
 	}
 }
 
@@ -69,8 +66,6 @@ sub getJobStatus {
 
 sub waitForSamples() {
 	for my $sampleName (sort keys %SAMPLES) {
-		next if (!defined($SAMPLES{$sampleName}{'job'}));
-
 		my $job = $SAMPLES{$sampleName}{'job'};
 		print STDERR "Waiting for $sampleName ($job)...";
 
@@ -86,7 +81,7 @@ sub waitForSamples() {
 sub makeExpressionMatrices {
 	# Get the directory of where this script is.  
 	my $dirname = dirname(__FILE__);
-	
+
 	# Gene-level expression
 	my $abundanceFiles = "";
 	for my $sampleName (sort keys %SAMPLES) {
@@ -114,13 +109,21 @@ sub makeExpressionMatrices {
 }
 
 sub main {
-	if (scalar(@ARGV) != 1) {
+	my $file = '';
+	my $tmpdir = '/scratch';
+
+	if (scalar(@ARGV) == 2) {
+		$tmpdir = $ARGV[0];
+		$file = $ARGV[1];
+	} elsif (scalar(@ARGV) == 1) {
+		$file = $ARGV[0];
+	} else {
 		print STDERR "Usage: $0 <samples.txt>\n";
 		exit(-1);
 	}
 
-	readSamples($ARGV[0]);
-	runSamples();
+	readSamples($file);
+	runSamples($tmpdir);
 	waitForSamples();
 	makeExpressionMatrices();
 }
