@@ -4,7 +4,7 @@ use warnings;
 
 use File::Basename;
 
-my $VERSION = "0.5.3e";
+my $VERSION = "0.5.3f";
 
 my $dryRun = 0;
 my %SAMPLES;
@@ -145,7 +145,7 @@ sub collectAndPrintMetrics {
 		}
 
 		# Collect FastQC Metrics
-		my $fastq_dir = $sampleName.'_1_fastqc';
+		my $fastq_dir = $sampleName.'_1.subsampled_fastqc';
 		if (-d "analysis/$sampleName/$fastq_dir") {
 			open(F, "<analysis/$sampleName/$fastq_dir/fastqc_data.txt") || die "Unable to open analysis/$sampleName/$fastq_dir/fastqc_data.txt";
 			@data = <F>;
