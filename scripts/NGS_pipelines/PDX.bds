@@ -2,15 +2,18 @@
 # Used to seperate human and mouse reads from PDX samples
 # Based on http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0074432#s2
 
-string external_packages = "/apps/sys/galaxy/external_packages"
-string bwaApp = "$external_packages/bin/bwa"
-string bowtie2App = "$external_packages/bin/bowtie2"
-string javaApp = "$external_packages/bin/java"
-string picardJar = "$external_packages/picard-tools-1.129/picard.jar"
-string samtoolsApp = "$external_packages/bin/samtools"
-string countReadPairsAppsJar = "/home/golharr/workspace/rgtools/dist/CountMappedReadPairs.jar" 
+#string external_packages = "/apps/sys/galaxy/external_packages"
+#string reference_genomes = "/ng18/galaxy/reference_genomes"
 
-string reference_genomes = "/ng18/galaxy/reference_genomes"
+string external_packages = "/ngs/apps"
+string reference_genomes = "/ngs/reference"
+
+string bwaApp = "$external_packages/bwa-0.7.12/bwa"
+string bowtie2App = "$external_packages/bowtie2-2.2.6/bowtie2"
+string javaApp = "$external_packages/jdk1.6.0_45/bin/java"
+string picardJar = "$external_packages/picard-tools-1.129/picard.jar"
+string samtoolsApp = "$external_packages/samtools-0.1.19/samtools"
+string countReadPairsAppsJar = "/home/golharr/workspace/rgtools/dist/CountMappedReadPairs.jar" 
 
 string graftGenome = "hg19"
 string graftReference = "$reference_genomes/$graftGenome/$graftGenome.fa"
