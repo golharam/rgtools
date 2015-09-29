@@ -701,8 +701,8 @@ fi
 
 # Remove temp dir created
 rm -rf *_`uname -n`_*
-# Removing *.gz files on local files 
-rm *.fastq
+# Removing unused local files 
+rm *.fastq *.chromReadSorted.bam *.rsem.transcript.bam *.rsem.transcript.sorted.bam* *.transcriptome.bam *.transcriptome.filtered.bam *.transcriptome.filtered.stripped.bam
 
 ##############################################################################
 # 13.  Transfer data to final resting place
