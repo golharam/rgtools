@@ -118,6 +118,7 @@ if [ $HELP == 1 ]; then
 	echo "  --delete-intermediate (delete intermediate files, not including source fq.gz) (not yet implemented)"
 	echo "	-h|--help"
 	echo "  -o|--outdir <output directory> [default=current working directory/analysis]"
+	echo "  --reference <path to reference directory>"
 	echo "  --sample-dir (consistently use same tmp dir, for debugging"
 	echo "  --subsample [# of reads]"
 	echo "  -t|--threads"
