@@ -46,7 +46,7 @@ sub runSamples {
 		print STDERR "Submitting $sampleName...\n";
 		
 		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
-		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,TMP_DIR=$tmpdir $dirname/ExomePipeline.sh";
+		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,AWS=1 $dirname/ExomePipeline.sh";
 		if ($dryRun == 1) {
 			print "$qsubCommand\n";
 		} else {

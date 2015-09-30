@@ -55,6 +55,12 @@ do
 		shift # past argument
 		;;
 
+		--targets)
+		TARGETREGIONS_BED="$2".bed
+		TARGETREGIONS_LIST="$2".list
+		shift # past argument
+		;;
+
 		--tmpdir)
 		TMP_DIR="$2"
 		shift # past argument
@@ -71,7 +77,7 @@ done
 if [ $HELP == 1 ]; then
 	echo "Usage 1: $0 <options> <usage>"
 	echo "where usage:"
-	echo "Usage 1: <options> [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
+	echo "Usage 1: <options> [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>] [--bait <path/to/baits/file] [--targets <path/to/targets/without/extension]"
 	echo "Options:"
 	echo "	-a|--aws"
 	echo "	-h|--help"
@@ -99,6 +105,9 @@ fi
 BWA=$EXT_PKGS_DIR/bwa-0.7.12/bwa
 FASTQC=$EXT_PKGS_DIR/FastQC-0.11.3-RG/fastqc
 FASTQVALIDATOR=$EXT_PKGS_DIR/fastQValidator-0.1.1a/bin/fastQValidator
+JAVA=$EXT_PKGS_DIR/jre1.7.0_67/bin/java
+PICARD_JAR=$EXT_PKGS_DIR/picard-tools-1.137/picard.jar
+RGTOOLS=$EXT_PKGS_DIR/rgtools
 
 # Reference data
 SPECIES=hg19
@@ -114,16 +123,15 @@ echo "AWS: $AWS"
 echo
 
 # Make tmp working directory aka SAMPLE_DIR
-SAMPLE_DIR=/scratch/$SAMPLE
-#if [ -z "$SAMPLE_DIR" ]
-#then
-#	cd $TMP_DIR
-#	SAMPLE_DIR=`mktemp -d --tmpdir=${TMP_DIR} ${SAMPLE}_XXXXXX`
+if [ -z "$SAMPLE_DIR" ]
+then
+	cd $TMP_DIR
+	SAMPLE_DIR=`mktemp -d --tmpdir=${TMP_DIR} ${SAMPLE}_XXXXXX`
 	if [ ! -d $SAMPLE_DIR ]
 	then
 	        mkdir $SAMPLE_DIR
 	fi
-#fi
+fi
 cd $SAMPLE_DIR
 echo "Working in `uname -n`:`pwd`"
 date '+%m/%d/%y %H:%M:%S'
@@ -280,7 +288,22 @@ fi
 
 if [ ! -e ${SAMPLE}.bam ]
 then
-	$JAVA -Xmx4G -Djava.io.tmpdir=. -jar $PICARD SortSam SO=coordinate INPUT=${SAMPLE}.sam OUTPUT=${SAMPLE}.bam VALIDATION_STRINGENCY=LENIENT CREATE_INDEX=true
+	echo "Sorting BAM"
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	$JAVA -Xmx4G -Djava.io.tmpdir=. -jar $PICARD_JAR SortSam SO=coordinate INPUT=${SAMPLE}.sam OUTPUT=${SAMPLE}.bam VALIDATION_STRINGENCY=LENIENT CREATE_INDEX=true
+
+	if [ $? -ne 0 ]
+	then
+		echo "Error sorting BAM"
+		rm $SAMPLE.bam
+	        exit -1
+	fi
+
+        echo "Finished sorting BAM file"
+        date '+%m/%d/%y %H:%M:%S'
+        echo
 fi
 
 ##############################################################
@@ -288,11 +311,11 @@ fi
 ##############################################################
 if [ ! -e ${SAMPLE}.alignment_summary_metrics.txt ]
 then
-	echo Collection alignment summary metrics
+	echo Collecting alignment summary metrics
 	date '+%m/%d/%y %H:%M:%S'
         echo
 
-	$JAVA -Xmx4G -Djava.io.tmpdir=. -jar $PICARD CollectAlignmentSummaryMetrics \
+	$JAVA -Xmx4G -Djava.io.tmpdir=. -jar $PICARD_JAR CollectAlignmentSummaryMetrics \
 		I=${SAMPLE}.bam \
 		O=${SAMPLE}.alignment_summary_metrics.txt \
 		LEVEL=SAMPLE \
@@ -301,14 +324,13 @@ then
         if [ $? -ne 0 ]
         then
                 echo "Encountered error collecting alignment summary metrics"
-                rm ${SAMPLE_NAME}.alignment_summary_metrics.txt 2>/dev/null
+                rm ${SAMPLE}.alignment_summary_metrics.txt 2>/dev/null
                 exit -1
         fi
 
         echo "Finished collecting alignment summary metrics"
         date '+%m/%d/%y %H:%M:%S'
         echo
-
 fi
 
 ##############################################################
@@ -320,7 +342,7 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	$JAVA -Djava.io.tmpdir=. -jar $PICARD MarkDuplicates \
+	$JAVA -Djava.io.tmpdir=. -jar $PICARD_JAR MarkDuplicates \
 		INPUT=${SAMPLE}.bam \
 		OUTPUT=${SAMPLE}.dedup.bam \
 		METRICS_FILE=${SAMPLE}.dedup_metrics.txt \
@@ -330,11 +352,11 @@ then
 	if [ $? -ne 0 ]
 	then
 		echo "Encountered removing duplicates"
-		rm ${SAMPLE_NAME}.dedup.ba? 2>/dev/null
+		rm ${SAMPLE}.dedup.ba? 2>/dev/null
 		exit -1
 	fi
 
-	echo Finished removing duplicates
+	echo Finished marking duplicates
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 fi
@@ -344,7 +366,22 @@ fi
 ##############################################################
 if [ ! -e $SAMPLE.targetRegionCoverage.txt ]
 then
+	echo Collecting target region coverage metrics
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
 	$JAVA -Xmx4G -Djava.io.tmpdir=. -jar $RGTOOLS/CalculateTargetRegionCoverage.jar B=${SAMPLE}.dedup.bam G=$TARGETREGIONS_BED O=$SAMPLE.targetRegionCoverage.txt
+
+	if [ $? -ne 0 ]
+	then
+		echo "Encountered collecting target region coverage metrics"
+		rm ${SAMPLE}.targetRegionCoverage.txt 2>/dev/null
+		exit -1
+	fi
+
+	echo Finished collecting target region coverage metrics
+	date '+%m/%d/%y %H:%M:%S'
+	echo
 fi
 
 ##############################################################
@@ -352,7 +389,22 @@ fi
 ##############################################################
 if [ ! -e $SAMPLE.hsmetrics.txt ]
 then
-	$JAVA -Xmx4G -jar $PICARD CalculateHsMetrics BI=$BAITREGIONS_INTERVAL TI=$TARGETREGIONS_INTERVAL REFERENCE_SEQUENCE=$REFERENCE I=${SAMPLE}.dedup.bam O=$SAMPLE.hsmetrics.txt PER_TARGET_COVERAGE=$SAMPLE.per_target_metrics.txt
+	echo Collecting hs metrics
+	date '+%m/%d/%y %H:%M:%S'
+	echo
+
+	$JAVA -Xmx4G -jar $PICARD_JAR CalculateHsMetrics BI=$TARGETREGIONS_LIST TI=$TARGETREGIONS_LIST REFERENCE_SEQUENCE=$REFERENCE I=${SAMPLE}.dedup.bam O=$SAMPLE.hsmetrics.txt PER_TARGET_COVERAGE=$SAMPLE.per_target_metrics.txt
+
+	if [ $? -ne 0 ]
+	then
+		echo "Encountered collecting hs metrics"
+		rm ${SAMPLE}.hsmetrics.txt 2>/dev/null
+		exit -1
+	fi
+
+	echo Finished collecting hs metrics
+	date '+%m/%d/%y %H:%M:%S'
+	echo
 fi
 
 ##############################################################################
@@ -364,6 +416,8 @@ then
 	echo "Moving ${SAMPLE_DIR} to ${OUTDIR}/${SAMPLE}"
 	mv ${SAMPLE_DIR} ${OUTDIR}/${SAMPLE}
 else
+	rm -rf $SAMPLE_DIR/ec2-user
+
 	aws s3 cp --recursive $SAMPLE_DIR s3://bmsrd-ngs-projects/${PROJECT}/${SAMPLE}
 	
 	if [ $? -ne 0 ]
@@ -372,7 +426,7 @@ else
 		exit -1
 	fi
 
-	#rm -rf $SAMPLE_DIR 2>/dev/null
+	rm -rf $SAMPLE_DIR 2>/dev/null
 fi
 
 echo
