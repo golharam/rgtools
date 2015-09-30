@@ -55,6 +55,11 @@ do
 		shift # past argument
 		;;
 
+		--project)
+		PROJECT="$2"
+		shift # past argument
+		;;
+
 		--targets)
 		TARGETREGIONS_BED="$2".bed
 		TARGETREGIONS_LIST="$2".list
@@ -74,6 +79,7 @@ do
 	shift	# past argument or value
 done
 
+# If help is specified, print help and exit
 if [ $HELP == 1 ]; then
 	echo "Usage 1: $0 <options> <usage>"
 	echo "where usage:"
@@ -81,11 +87,12 @@ if [ $HELP == 1 ]; then
 	echo "Options:"
 	echo "	-a|--aws"
 	echo "	-h|--help"
+	echo "	--project [project name]"
 	echo "  --tmpdir <scratch space>"
 	exit 0
 fi
 
-# If variables are not set as an environment variable or as a parameter, set them to default here.
+# If variables are not set as an environment variable or as a parameter, set them to default here
 if [ -z "$AWS" ]; then
 	AWS=0
 fi
@@ -93,9 +100,23 @@ if [ -z "$TMP_DIR" ]; then
 	TMP_DIR=/scratch
 fi
 
+# If variables are not set, error out
+if [ -z "$TARGETREGIONS" ]; then
+	echo "Must specify TARGETREGIONS"
+	exit -1
+else 
+	TARGETREGIONS_BED="$TARGETREGIONS".bed
+	TARGETREGIONS_LIST="$TARGETREGIONS".list
+fi
+
 if [ $AWS -eq 1 ]; then
 	EXT_PKGS_DIR=/ngs/apps
 	REFERENCE_DIR=/ngs/reference
+
+	if [ -z "$PROJECT" ]; then
+		echo "Project must be specified when runing in AWS"
+		exit -1
+	fi
 else
 	EXT_PKGS_DIR=/apps/sys/galaxy/external_packages
 	REFERENCE_DIR=/ng18/galaxy/reference_genomes	
@@ -117,16 +138,19 @@ BWA_REFERENCE="$REFERENCE_DIR/$SPECIES/bwa_index/$SPECIES"
 # Start Analysis
 echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
+echo "Project: $PROJECT"
 echo "Pipeline: $VERSION"
 echo "TmpDir: $TMP_DIR"
 echo "AWS: $AWS"
 echo
+analysis_date_started=$(date +"%s")
 
 # Make tmp working directory aka SAMPLE_DIR
 if [ -z "$SAMPLE_DIR" ]
 then
 	cd $TMP_DIR
-	SAMPLE_DIR=`mktemp -d --tmpdir=${TMP_DIR} ${SAMPLE}_XXXXXX`
+	#SAMPLE_DIR=`mktemp -d --tmpdir=${TMP_DIR} ${SAMPLE}_XXXXXX`
+	SAMPLE_DIR=$TMP_DIR/$SAMPLE
 	if [ ! -d $SAMPLE_DIR ]
 	then
 	        mkdir $SAMPLE_DIR
@@ -432,4 +456,7 @@ fi
 echo
 echo Finished analyzing ${SAMPLE} 
 date '+%m/%d/%y %H:%M:%S' 
-echo
+analysis_date_finished=$(date +"%s")
+diff=$(($analysis_date_finished-$analysis_date_started))
+echo "Total analysis took $(($diff / 60)) minutes and $(($diff % 60)) seconds."
+

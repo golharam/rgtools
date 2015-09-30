@@ -36,7 +36,7 @@ sub readSamples {
 }
 
 sub runStage1 {
-	my ($tmpdir) = @_;
+	my ($project, $targetRegions) = @_;
 
 	# Get the directory of where this script is.  
 	my $dirname = dirname(__FILE__);
@@ -46,7 +46,7 @@ sub runStage1 {
 		print STDERR "Submitting $sampleName...\n";
 		
 		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
-		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,AWS=1 $dirname/ExomePipeline.sh";
+		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,PROJECT=$project,AWS=1,TARGETREGIONS=$targetRegions $dirname/ExomePipeline.sh";
 		if ($dryRun == 1) {
 			print "$qsubCommand\n";
 		} else {
@@ -78,19 +78,21 @@ sub waitForSamples {
 }
 
 sub main {
-	my $tmpdir = '/scratch';
+	my $project = '';
+	my $targetRegions = '';
 	my $samplesFile = '';
 
-	if (scalar(@ARGV) == 2) {
-		$tmpdir = $ARGV[0];
-		$samplesFile = $ARGV[1];
+	if (scalar(@ARGV) == 3) {
+		$project = $ARGV[0];
+		$targetRegions = $ARGV[1];
+		$samplesFile = $ARGV[2];
 	} else {
-		print STDERR "Usage: $0 <tmpdir> <samples.txt>\n";
+		print STDERR "Usage: $0 <project> <targetregions> <samples.txt>\n";
 		exit(-1);
 	}
 
 	readSamples($samplesFile);
-	runStage1($tmpdir);
+	runStage1($project, $targetRegions);
 	waitForSamples();
 }
 main();
