@@ -2,6 +2,8 @@
 use strict;
 use warnings;
 
+my $VERSION = "0.04";
+
 use File::Basename;
 
 my %SAMPLES;
@@ -85,7 +87,7 @@ sub makeExpressionMatrices {
 	# Gene-level expression
 	my $abundanceFiles = "";
 	for my $sampleName (sort keys %SAMPLES) {
-		my $abundanceFile = "$sampleName/$sampleName.rsem.genes.results";
+		my $abundanceFile = "analysis/$sampleName/$sampleName.rsem.genes.results";
 		if (! -e $abundanceFile) {
 			die "Unable to locate $abundanceFile\n";
 		}
@@ -96,7 +98,7 @@ sub makeExpressionMatrices {
 	# Isoform-level expression
 	$abundanceFiles = "";
 	for my $sampleName (sort keys %SAMPLES) {
-		my $abundanceFile = "$sampleName/$sampleName.rsem.isoforms.results";
+		my $abundanceFile = "analysis/$sampleName/$sampleName.rsem.isoforms.results";
 		if (! -e $abundanceFile) {
 			die "Unable to locate $abundanceFile\n";
 		}
