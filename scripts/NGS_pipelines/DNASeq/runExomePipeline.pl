@@ -35,7 +35,7 @@ sub readSamples {
 	print STDERR "\nFound ", scalar(keys %SAMPLES), " samples.\n";
 }
 
-sub runSamples {
+sub runStage1 {
 	my ($tmpdir) = @_;
 
 	# Get the directory of where this script is.  
@@ -90,7 +90,7 @@ sub main {
 	}
 
 	readSamples($samplesFile);
-	runSamples($tmpdir);
+	runStage1($tmpdir);
 	waitForSamples();
 }
 main();
