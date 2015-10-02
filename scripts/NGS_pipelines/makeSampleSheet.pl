@@ -4,19 +4,17 @@ use File::Basename;
 
 # This script creates a smple sheet of (sample, fq1, fq2)
 # Input is a text file of fq.gz.  FQ files must be named <sample>_[12].fq.gz
+if (scalar(@ARGV) != 1) {
+	die "Usage: $0 <fastqFiles.txt>\n";
+}
 
 my %SAMPLES;
 
-my $cwd = `pwd`;
-chomp $cwd;
-
-# allsamples.txt should be a text file of all the fastq.gz files
-# Typically made with: find <path> -name '*.fastq.gz
-for my $gzfile (`cat allsamples.txt`) {
+for my $gzfile (`cat $ARGV[0]`) {
 	chomp $gzfile;
 
 	# Breakup $gzfile into its parts
-	my @suffixes = (".clipped.fastq.gz", ".fq.gz", ".fastq.gz");
+	my @suffixes = (".clipped.fastq.gz", ".fq.gz", ".fastq.gz", ".clean.fq.gz.aes");
 	my ($filename, $dir, $suffix) = fileparse($gzfile, @suffixes);
 
 	# Get the sample name from the filename
