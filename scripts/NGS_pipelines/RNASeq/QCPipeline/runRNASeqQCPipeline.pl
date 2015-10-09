@@ -2,12 +2,46 @@
 use strict;
 use warnings;
 
-use File::Basename;
+=head1 SYNOPSIS
 
-my $VERSION = "0.5.3f";
+runRNASeqQCPipeline.pl
+	[--dryRun                (default: False] 
+	[--subsample <subsample> (default: 0)] 
+	[--tmpdir <tmpdir>       (default: /scratch)] 
+	[--refmodel <refmodel>     (default: hg19ERCC.refSeq)] 
+	--samples <samples.txt>
+
+=cut
+
+use File::Basename;
+use Getopt::Long;
+use Pod::Usage 'pod2usage';
+
+my $VERSION = "0.5.4";
 
 my $dryRun = 0;
 my %SAMPLES;
+
+sub main {
+	my $subsample = 0;
+	my $refmodel = 'hg19ERCC';
+	my $tmpdir = '/scratch';
+	my $sampleSheet;
+
+	GetOptions('dryRun' => $dryRun,
+                   'subsample:0' => $subsample,
+                   'refmodel=s' => $refmodel,
+                   'tmpdir:s' => $tmpdir,
+                   'samples=s' => $sampleSheet) or pod2usage;
+	pos2usage unless $sampleSheet;
+
+	readSamples($sampleSheet);
+	runSamples($subsample, $refmodel, $tmpdir);
+	if ($dryRun != 1) {
+		waitForSamples();
+		collectAndPrintMetrics();
+	}
+}
 
 sub readSamples {
 	my ($sampleSheet) = @_;
@@ -38,14 +72,14 @@ sub readSamples {
 sub runSamples {
 	# Get the directory of where this script is.  
 	my $dirname = dirname(__FILE__);
-	my ($subsample, $species, $tmpdir) = @_;
+	my ($subsample, $refmodel, $tmpdir) = @_;
 
 	for my $sampleName (sort keys %SAMPLES) {
-		next if (-d $sampleName);
+		next if (-d "analysis/$sampleName");
 		print STDERR "Submitting $sampleName...\n";
 		
 		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
-		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,USE_STAR=0,AWS=0,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFERENCE=$species $dirname/rnaseqqc_pipeline.sh";
+		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFMODEL=$refmodel $dirname/rnaseqqc_pipeline.sh";
 		if ($dryRun == 1) {
 			print "$qsubCommand\n";
 		} else {
@@ -301,29 +335,6 @@ sub collectAndPrintMetrics {
 	#}
 	#$_ = join(" ", @METRICFILES);
 	#`Rscript $dirname/multiRnaSeqCoverage.R $_ analysis/rnaseq.txt analysis/rnaseq.png`;
-}
-
-
-sub main {
-	my $subsample = 0;
-	my $species = 'hg19ERCC';
-	my $tmpdir = '/scratch';
-	my $file = '';
-
-	if (scalar(@ARGV) == 4) {
-		$subsample = $ARGV[0];
-		$species = $ARGV[1];
-		$tmpdir = $ARGV[2];
-		$file = $ARGV[3];
-	} else {
-		print STDERR "Usage: $0 <subsample> <species> <tmpdir> <samples.txt>\n";
-		exit(-1);
-	}
-
-	readSamples($file);
-	runSamples($subsample, $species, $tmpdir);
-	waitForSamples();
-	collectAndPrintMetrics();
 }
 
 main();

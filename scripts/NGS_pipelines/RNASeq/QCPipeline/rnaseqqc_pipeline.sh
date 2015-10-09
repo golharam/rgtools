@@ -5,13 +5,15 @@
 #$ -j y
 #$ -pe orte 8
 
+# runRNASeqQCPipeline will pass the following env vars:
+# SAMPLE, FASTQ1, FASTQ2, SUBSAMPLE, TMP_DIR, REFMODEL
+
 ###############################################################################
 # Set default values.  These can be set via command-line options only.  
 # Setting them here overrides environment variables
 ###############################################################################
-VERSION=0.5.3g
+VERSION=0.5.4
 HELP=0
-DELETE_INTERMEDIATE=0
 THREADS=8
 
 if [ $# -eq 0 ]
@@ -33,14 +35,6 @@ while [[ $# > 0 ]]
 do
 	key="$1"
 	case $key in
-		-a|--aws)
-		AWS=1
-		;;
-
-		--delete-intermediate)
-		DELETE_INTERMEDIATE=1
-		;;
-
 		-1|--fastq1)
 		FASTQ1="$2"
 		shift # past argument
@@ -70,8 +64,8 @@ do
 		shift # past argument
 		;;
 
-		--reference)
-		REFERENCE="$2"
+		--refmodel)
+		REFMODEL="$2"
 		shift # past argument
 		;;
 		
@@ -109,35 +103,26 @@ done
 
 if [ $HELP == 1 ]; then
 	echo "Usage 1: $0 <options> <usage>"
-	echo "Usage 2: $0 <options> <usage>"
 	echo "where usage:"
 	echo "Usage 1: [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
-	echo "Usage 2: [-s|--sample <SRA ID>] [--sraftp <ftp location>]" 
 	echo "Options:"
-	echo "	-a|--aws"
-	echo "  --delete-intermediate (delete intermediate files, not including source fq.gz) (not yet implemented)"
 	echo "	-h|--help"
 	echo "  -o|--outdir <output directory> [default=current working directory/analysis]"
-	echo "  --reference <path to reference directory>"
+	echo "  --refmodel <reference model> (hg19ERCC/mm10ERCC/rn6ERCC) (default=hg19ERCC)"
 	echo "  --sample-dir (consistently use same tmp dir, for debugging"
 	echo "  --subsample [# of reads]"
-	echo "  -t|--threads"
-	echo "  --use-star"
 	exit 0
 fi
 
 # If variables are not set as an environment variable or as a parameter, set them to default here.
-if [ -z "$AWS" ]; then
-	AWS=0
-fi
 if [ -z "$OUTDIR" ]; then
 	OUTDIR=`pwd`/analysis
 fi
 if [ -z "$SUBSAMPLE" ]; then
 	SUBSAMPLE=0
 fi
-if [ -z "$REFERENCE" ]; then
-	REFERENCE=hg19ERCC
+if [ -z "$REFMODEL" ]; then
+	REFMODEL="hg19ERCC.refSeq"
 fi
 if [ -z "$TMP_DIR" ]; then
 	TMP_DIR=/scratch
@@ -146,7 +131,7 @@ if [ -z "$USE_STAR" ]; then
 	USE_STAR=0
 fi
 
-if [ $AWS -eq 1 ]; then
+if [ -e /ngs/apps ]; then
 	EXT_PKGS_DIR=/ngs/apps
 	REFERENCE_DIR=/ngs/reference
 else
@@ -179,15 +164,16 @@ export PATH=$BOWTIE2:$R_DIR:$TOPHAT2:$PATH
 CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/contamination.fa
 CONTAMINATION_REFERENCE_BOWTIE2=$REFERENCE_DIR/contamination/bowtie2_index/contamination
 CONTAMINATION_REFERENCE_STAR=$REFERENCE_DIR/contamination/STAR_index
-REFERENCE_STAR=$REFERENCE_DIR/$REFERENCE/STAR_index
+REFERENCE=`echo $REFMODEL | cut -f 1 '.'`
+GENEMODEL=`echo $REFMODEL | cut -f 2 '.'`
 
 # Start Analysis
 echo "Processing $SAMPLE"
 date '+%m/%d/%y %H:%M:%S'
 echo "Pipeline: $VERSION"
+echo "Reference Model: $REFMODEL"
 echo "Subsample: $SUBSAMPLE"
 echo "TmpDir: $TMP_DIR"
-echo "AWS: $AWS"
 echo
 
 # Make tmp working directory aka SAMPLE_DIR
@@ -208,7 +194,6 @@ echo
 
 ##############################################################################
 # Step 1: Download the file to the local scratch space
-# If SRA, download from SRA -> [${SAMPLE}_1.fastq.gz, ${SAMPLE}_2.fastq.gz]
 # If FTP, download from FTP -> [${SAMPLE}_1.fastq.gz, ${SAMPLE}_2.fastq.gz]
 # If AWS, copy  from kraken -> [${SAMPLE}_1.fastq.gz, ${SAMPLE}_2.fastq.gz]
 # Else assume file is local and unknown if compressed or not.  
@@ -829,10 +814,8 @@ then
 	echo "Moving ${SAMPLE_DIR} to ${OUTDIR}/${SAMPLE}"
 	mv ${SAMPLE_DIR} ${OUTDIR}/${SAMPLE}
 else
-	# TBD: This is project specific and needs to be parameterized
-	aws s3 cp --recursive $SAMPLE_DIR s3://bmsrd-ngs-M2GEN/${SAMPLE}
-	#scp -r $SAMPLE_DIR golharr@kraken.pri.bms.com:/home/golharr/ngsprojects/M2GEN-TCGA/analysis/${SAMPLE}
-	
+	aws s3 cp --recursive $SAMPLE_DIR ${S3BUCKET}/${PROJECT}/${SAMPLE}
+
 	if [ $? -ne 0 ]
 	then
 		echo Error copying $SAMPLE_DIR
