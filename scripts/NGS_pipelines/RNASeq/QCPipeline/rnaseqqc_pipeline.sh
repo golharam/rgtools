@@ -102,21 +102,26 @@ do
 done
 
 if [ $HELP == 1 ]; then
-	echo "Usage 1: $0 <options> <usage>"
-	echo "where usage:"
-	echo "Usage 1: [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
+	echo "Usage: rnaseqqc_pipeline.sh [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]"
 	echo "Options:"
-	echo "	-h|--help"
-	echo "  -o|--outdir <output directory> [default=current working directory/analysis]"
+	echo "  -h|--help"
+	echo "  -o|--outdir <output directory> [default=current working directory]"
 	echo "  --refmodel <reference model> (hg19ERCC/mm10ERCC/rn6ERCC) (default=hg19ERCC)"
-	echo "  --sample-dir (consistently use same tmp dir, for debugging"
+	echo "  --sample-dir (analysis directory to use. Use same tmp dir, for debugging"
 	echo "  --subsample [# of reads]"
-	exit 0
+	exit 2
 fi
 
 # If variables are not set as an environment variable or as a parameter, set them to default here.
+if [ -z "$AWS" ]; then
+	AWS=0
+fi
 if [ -z "$OUTDIR" ]; then
-	OUTDIR=`pwd`/analysis
+	OUTDIR=`pwd`
+fi
+if [ ! -e $OUTDIR ]; then
+	echo "$OUTDIR does not exist"
+	exit -1
 fi
 if [ -z "$SUBSAMPLE" ]; then
 	SUBSAMPLE=0
@@ -164,8 +169,8 @@ export PATH=$BOWTIE2:$R_DIR:$TOPHAT2:$PATH
 CONTAMINATION_REFERENCE=$REFERENCE_DIR/contamination/contamination.fa
 CONTAMINATION_REFERENCE_BOWTIE2=$REFERENCE_DIR/contamination/bowtie2_index/contamination
 CONTAMINATION_REFERENCE_STAR=$REFERENCE_DIR/contamination/STAR_index
-REFERENCE=`echo $REFMODEL | cut -f 1 '.'`
-GENEMODEL=`echo $REFMODEL | cut -f 2 '.'`
+REFERENCE=`echo $REFMODEL | cut -f 1 -d '.'`
+GENEMODEL=`echo $REFMODEL | cut -f 2 -d '.'`
 
 # Start Analysis
 echo "Processing $SAMPLE"
@@ -173,22 +178,26 @@ date '+%m/%d/%y %H:%M:%S'
 echo "Pipeline: $VERSION"
 echo "Reference Model: $REFMODEL"
 echo "Subsample: $SUBSAMPLE"
-echo "TmpDir: $TMP_DIR"
-echo
 
 # Make tmp working directory aka SAMPLE_DIR
 if [ -z "$SAMPLE_DIR" ]
 then
 	cd $TMP_DIR
 	SAMPLE_DIR=`mktemp -d --tmpdir=${TMP_DIR} ${SAMPLE}_XXXXXX`
-	if [ ! -d $SAMPLE_DIR ]
-	then
-	        mkdir $SAMPLE_DIR
-	fi
+fi
+if [ ! -d $SAMPLE_DIR ]
+then
+        mkdir $SAMPLE_DIR
 fi
 cd $SAMPLE_DIR
+
 echo "Working in `uname -n`:`pwd`"
-echo "Output dir is $OUTDIR"
+if [ $AWS -eq 0 ]
+then
+	echo "Output dir is $OUTDIR/$SAMPLE"
+else
+	echo "Output dir is ${S3BUCKET}/${PROJECT}/${SAMPLE}"
+fi
 date '+%m/%d/%y %H:%M:%S'
 echo
 
@@ -466,8 +475,10 @@ else
 	echo "Not subsampling...using entire set of reads..."
 	echo
 	
-	ln -s ${SAMPLE}_1.fastq ${SAMPLE}_1.subsampled.fastq
-	if [ -e ${SAMPLE}_2.fastq ]; then
+	if [ ! -e ${SAMPLE}_1.subsampled.fastq ]; then
+		ln -s ${SAMPLE}_1.fastq ${SAMPLE}_1.subsampled.fastq
+	fi
+	if [ -e ${SAMPLE}_2.fastq ] && [ ! -e ${SAMPLE}_2.subsampled.fastq ]; then
 		ln -s ${SAMPLE}_2.fastq ${SAMPLE}_2.subsampled.fastq
 	fi
 fi
@@ -475,7 +486,7 @@ fi
 ##############################################################################
 # Step 5: Run FastQC
 ##############################################################################
-if [ ! -e "${SAMPLE}_fastqc.zip" ]
+if [ ! -e "${SAMPLE}_1.subsampled_fastqc.zip" ]
 then
 	echo "Running FastQC"
 	date '+%m/%d/%y %H:%M:%S'
