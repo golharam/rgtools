@@ -28,7 +28,7 @@ oneTimeSetUp()
   # else this script will re-run the analysis which can
   # take longer.
   sampleName="test1.hg19ERCC.refSeq"
-  copyResults=1
+  copyResults=0
   if [ ${copyResults} -eq 1 ]; then
     resultsDir="/home/golharr/ngsprojects/test/analysis/${sampleName}"
     echo "Copying ${resultsDir} to ${outDir}/"

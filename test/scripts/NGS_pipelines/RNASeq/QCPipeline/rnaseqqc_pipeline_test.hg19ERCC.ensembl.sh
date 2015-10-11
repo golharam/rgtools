@@ -19,7 +19,7 @@ oneTimeSetUp()
   # else this script will re-run the analysis which can
   # take longer.
   sampleName="test1.hg19ERCC.ensembl"
-  copyResults=1
+  copyResults=0
   resultsDir="/home/golharr/ngsprojects/test/analysis/${sampleName}"
 
   # This is where the test suite will run.  Don't change it.
