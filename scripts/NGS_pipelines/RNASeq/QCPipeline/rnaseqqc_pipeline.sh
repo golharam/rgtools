@@ -492,7 +492,11 @@ then
 	date '+%m/%d/%y %H:%M:%S'
 	echo
 
-	$FASTQC --quiet --outdir=. --extract -t 2 ${SAMPLE}_1.subsampled.fastq ${SAMPLE}_2.subsampled.fastq 
+	if [ ! -e "${SAMPLE}_2.subsampled.fastq" ]; then
+		$FASTQC --quiet --outdir=. --extract -t 2 ${SAMPLE}_1.subsampled.fastq
+	else 
+		$FASTQC --quiet --outdir=. --extract -t 2 ${SAMPLE}_1.subsampled.fastq ${SAMPLE}_2.subsampled.fastq 
+	fi
 
 	if [ $? -ne 0 ]
 	then
@@ -536,12 +540,22 @@ then
 		mv Unmapped.out.mate1 ../${SAMPLE}_1.uncontaminated.fastq
 		mv Unmapped.out.mate2 ../${SAMPLE}_2.uncontaminated.fastq
 	else
-		$BOWTIE2/bowtie2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
-			 --al-conc-gz $SAMPLE.contaminated.fastq.gz \
-			 -p $THREADS -1 ../${SAMPLE}_1.subsampled.fastq -2 ../${SAMPLE}_2.subsampled.fastq \
-			 --no-unal --rg-id $SAMPLE \
-			 --rg "SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina" \
-			 -S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE_BOWTIE2 2>$SAMPLE.contamination.log
+		if [ ! -e ../${SAMPLE}_2.subsampled.fastq ]; then
+			$BOWTIE2/bowtie2 \
+				--un-gz $SAMPLE.uncontaminated.fastq.gz \
+				--al-gz $SAMPLE.contaminated.fastq.gz \
+				-p $THREADS \
+				-x $CONTAMINATION_REFERENCE_BOWTIE2 \
+				-U ../${SAMPLE}_1.subsampled.fastq \
+				-S $SAMPLE.contaminated.sam 2>$SAMPLE.contamination.log
+		else
+			$BOWTIE2/bowtie2 --no-mixed --un-conc-gz $SAMPLE.uncontaminated.fastq.gz \
+				--al-conc-gz $SAMPLE.contaminated.fastq.gz \
+				-p $THREADS -1 ../${SAMPLE}_1.subsampled.fastq -2 ../${SAMPLE}_2.subsampled.fastq \
+				--no-unal --rg-id $SAMPLE \
+				--rg "SM:$SAMPLE\tLB:$SAMPLE\tPL:illumina" \
+				-S $SAMPLE.contaminated.sam -x $CONTAMINATION_REFERENCE_BOWTIE2 2>$SAMPLE.contamination.log
+		fi
 	
 		if [ $? -ne 0 ]; then
 			echo "Error running bowtie2 for contamination:"
@@ -586,8 +600,12 @@ then
 		fi		
 
 		rm $SAMPLE.contaminated.sam
-		mv ${SAMPLE}.uncontaminated.fastq.1.gz ../
-		mv ${SAMPLE}.uncontaminated.fastq.2.gz ../
+		if [ ! -e ../${SAMPLE}_2.subsampled.fastq ]; then
+			mv ${SAMPLE}.uncontaminated.fastq.gz ../${SAMPLE}.uncontaminated.fastq.1.gz
+		else
+			mv ${SAMPLE}.uncontaminated.fastq.1.gz ../
+			mv ${SAMPLE}.uncontaminated.fastq.2.gz ../
+		fi
 	fi
 	
 	cd ..
@@ -636,10 +654,18 @@ then
 	echo
 
 	# TBD: Output unaligned reads as well, or else CollectAlignmentMetrics thinks all the reads aligned.
-	$TOPHAT2/tophat2 -p $THREADS \
-		 --rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
-		$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE \
-		$SAMPLE.uncontaminated.fastq.1.gz $SAMPLE.uncontaminated.fastq.2.gz
+	if [ ! -e $SAMPLE.uncontaminated.fastq.2.gz ]
+	then
+		$TOPHAT2/tophat2 -p $THREADS \
+			--rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
+			$REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE \
+			$SAMPLE.uncontaminated.fastq.1.gz 
+	else
+                $TOPHAT2/tophat2 -p $THREADS \
+                        --rg-id 1 --rg-sample $SAMPLE --rg-library $SAMPLE --rg-platform illumina \
+                        $REFERENCE_DIR/$REFERENCE/bowtie2_index/$REFERENCE \
+                        $SAMPLE.uncontaminated.fastq.1.gz $SAMPLE.uncontaminated.fastq.2.gz
+	fi
 
 	if [ $? -ne 0 ] && [ ! -e tophat_out/accepted_hits.bam ]
 	then
@@ -719,6 +745,8 @@ then
         date '+%m/%d/%y %H:%M:%S'
         echo
 
+	# For single-end data, this will product no output, so don't bother
+	# running it.
         java -Xmx4G -jar $PICARD_JAR CollectInsertSizeMetrics \
                 INPUT=${SAMPLE}.bam \
                 OUTPUT=${SAMPLE}.insertSizeMetrics.txt \
