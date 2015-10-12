@@ -762,6 +762,7 @@ fi
 
 ##############################################################################
 # 10b.  Collect RNA Seq Metrics for hemoglobin
+# Good article about hemoglobin genes: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3543078/
 ##############################################################################
 if [ ! -e ${SAMPLE}.hemoglobinMetrics.txt ]
 then

@@ -1,3 +1,0 @@
-Finished processing /home/golharr/workspace/rgtools/test_data/scripts/NGS_pipelines/RNASeq/QCPipeline/test1_2.fastq.gz with 4000000 lines containing 1000000 sequences.
-There were a total of 0 errors.
-Returning: 0 : FASTQ_SUCCESS
