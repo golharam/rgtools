@@ -26,14 +26,16 @@ sub main {
 	my $subsample = 0;
 	my $refmodel = 'hg19ERCC';
 	my $tmpdir = '/scratch';
-	my $sampleSheet;
+	my $sampleSheet = '';
 
-	GetOptions('dryRun' => $dryRun,
-                   'subsample:0' => $subsample,
-                   'refmodel=s' => $refmodel,
-                   'tmpdir:s' => $tmpdir,
-                   'samples=s' => $sampleSheet) or pod2usage;
-	pos2usage unless $sampleSheet;
+	# TBD: Something is wrong with 
+	# 'tmpdir:s' => $tmpdir
+	GetOptions('dryRun' => \$dryRun,
+		   'subsample:0' => \$subsample,
+		   'refmodel=s' => \$refmodel,
+		   'tmpdir=s' => \$tmpdir,
+		   'samples=s' => \$sampleSheet);
+	pod2usage unless $sampleSheet;
 
 	readSamples($sampleSheet);
 	runSamples($subsample, $refmodel, $tmpdir);
