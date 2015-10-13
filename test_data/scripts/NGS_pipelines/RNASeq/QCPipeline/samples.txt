@@ -1,0 +1,2 @@
+test1	/home/golharr/workspace/rgtools/test_data/scripts/NGS_pipelines/RNASeq/QCPipeline/test1_1.fastq.gz	/home/golharr/workspace/rgtools/test_data/scripts/NGS_pipelines/RNASeq/QCPipeline/test1_2.fastq.gz
+test2	/home/golharr/workspace/rgtools/test_data/scripts/NGS_pipelines/RNASeq/QCPipeline/test2_1.fastq.gz	/home/golharr/workspace/rgtools/test_data/scripts/NGS_pipelines/RNASeq/QCPipeline/test2_2.fastq.gz

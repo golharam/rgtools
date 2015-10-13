@@ -6,9 +6,10 @@ use warnings;
 
 runRNASeqQCPipeline.pl
 	[--dryRun                (default: False] 
+        [--outdir <output dir>   (default: current directory)
+	[--refmodel <refmodel>   (default: hg19ERCC.refSeq)]
 	[--subsample <subsample> (default: 0)] 
 	[--tmpdir <tmpdir>       (default: /scratch)] 
-	[--refmodel <refmodel>     (default: hg19ERCC.refSeq)] 
 	--samples <samples.txt>
 
 =cut
@@ -23,6 +24,7 @@ my $dryRun = 0;
 my %SAMPLES;
 
 sub main {
+	my $outdir = `pwd`; chomp $outdir;
 	my $subsample = 0;
 	my $refmodel = 'hg19ERCC';
 	my $tmpdir = '/scratch';
@@ -31,17 +33,26 @@ sub main {
 	# TBD: Something is wrong with 
 	# 'tmpdir:s' => $tmpdir
 	GetOptions('dryRun' => \$dryRun,
+		   'outdir=s' => \$outdir,
 		   'subsample:0' => \$subsample,
 		   'refmodel=s' => \$refmodel,
 		   'tmpdir=s' => \$tmpdir,
 		   'samples=s' => \$sampleSheet);
 	pod2usage unless $sampleSheet;
 
+	print STDERR "dryRun: $dryRun\n";
+	print STDERR "outdir: $outdir\n";
+	print STDERR "subsample: $subsample\n";
+	print STDERR "refmodel: $refmodel\n";
+	print STDERR "tpmdir: $tmpdir\n";
+	print STDERR "samples: $sampleSheet\n";
+	print STDERR "\n";
+
 	readSamples($sampleSheet);
-	runSamples($subsample, $refmodel, $tmpdir);
+	runSamples($subsample, $refmodel, $tmpdir, $outdir);
 	if ($dryRun != 1) {
 		waitForSamples();
-		collectAndPrintMetrics();
+		collectAndPrintMetrics($outdir);
 	}
 }
 
@@ -74,14 +85,14 @@ sub readSamples {
 sub runSamples {
 	# Get the directory of where this script is.  
 	my $dirname = dirname(__FILE__);
-	my ($subsample, $refmodel, $tmpdir) = @_;
+	my ($subsample, $refmodel, $tmpdir, $outdir) = @_;
 
 	for my $sampleName (sort keys %SAMPLES) {
-		next if (-d "analysis/$sampleName");
+		next if (-d "$outdir/$sampleName");
 		print STDERR "Submitting $sampleName...\n";
 		
 		my ($fq1, $fq2) = ($SAMPLES{$sampleName}{'fq1'}, $SAMPLES{$sampleName}{'fq2'});
-		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFMODEL=$refmodel $dirname/rnaseqqc_pipeline.sh";
+		my $qsubCommand = "qsub -N $sampleName -v SAMPLE=$sampleName,FASTQ1=$fq1,FASTQ2=$fq2,SUBSAMPLE=$subsample,TMP_DIR=$tmpdir,REFMODEL=$refmodel,OUTDIR=$outdir $dirname/rnaseqqc_pipeline.sh";
 		if ($dryRun == 1) {
 			print "$qsubCommand\n";
 		} else {
@@ -125,6 +136,7 @@ sub waitForSamples {
 }
 
 sub collectAndPrintMetrics {
+	my ($outdir) = @_;
 	my @FASTQVALIDATOR_METRICS = ('fq1RawCount' , 'fq2RawCount');
 	my @FASTQC_METRICS = ('Basic Statistics', 'Per base sequence quality', 'Per tile sequence quality', 'Per sequence quality scores', 'Per base sequence content', 'Per sequence GC content', 'Per base N content', 'Sequence Length Distribution', 'Sequence Duplication Levels', 'Overrepresented sequences', 'Adapter Content', 'Kmer Content', 'pctA', 'pctC', 'pctG', 'pctT', 'pctGC');
 	my @CONTAMINATION_HEADER = ('ContaminatedReadPairs', '%Contamination');
@@ -159,15 +171,15 @@ sub collectAndPrintMetrics {
 		print QC "$sampleName";
 
 		# Collect FastQValidator Metrics
-		open(F, "<analysis/$sampleName/$sampleName.fq1Validator.txt") || die "Unable to open analysis/$sampleName/$sampleName.fq1Validator.txt";
+		open(F, "<$outdir/$sampleName/$sampleName.fq1Validator.txt") || die "Unable to open $outdir/$sampleName/$sampleName.fq1Validator.txt";
 		@data = <F>;
 		close(F);
 		chomp(@data);
 		if ($data[0] =~ m/containing (\d+) sequences./) {
 			$SAMPLES{$sampleName}{'fastQValidator'}{'fq1RawCount'} = $1;
 		}
-		if (-e "analysis/$sampleName/$sampleName.fq2Validator.txt") {
-	                open(F, "<analysis/$sampleName/$sampleName.fq2Validator.txt") || die "Unable to open analysis/$sampleName/$sampleName.fq2Validator.txt";
+		if (-e "$outdir/$sampleName/$sampleName.fq2Validator.txt") {
+	                open(F, "<$outdir/$sampleName/$sampleName.fq2Validator.txt") || die "Unable to open $outdir/$sampleName/$sampleName.fq2Validator.txt";
 	                @data = <F>;
         	        close(F);
                 	chomp(@data);
@@ -182,8 +194,8 @@ sub collectAndPrintMetrics {
 
 		# Collect FastQC Metrics
 		my $fastq_dir = $sampleName.'_1.subsampled_fastqc';
-		if (-d "analysis/$sampleName/$fastq_dir") {
-			open(F, "<analysis/$sampleName/$fastq_dir/fastqc_data.txt") || die "Unable to open analysis/$sampleName/$fastq_dir/fastqc_data.txt";
+		if (-d "$outdir/$sampleName/$fastq_dir") {
+			open(F, "<$outdir/$sampleName/$fastq_dir/fastqc_data.txt") || die "Unable to open $outdir/$sampleName/$fastq_dir/fastqc_data.txt";
 			@data = <F>;
 			close(F);
 			chomp(@data);
@@ -208,7 +220,7 @@ sub collectAndPrintMetrics {
 				$SAMPLES{$sampleName}{'FastQC'}{'pctGC'} = $1;
 			}
 			
-			open(F, "<analysis/$sampleName/$fastq_dir/summary.txt") || die "Unable to open analysis/$sampleName/$fastq_dir/summary.txt";
+			open(F, "<$outdir/$sampleName/$fastq_dir/summary.txt") || die "Unable to open $outdir/$sampleName/$fastq_dir/summary.txt";
 			while (<F>) {
 				chomp;
 				my @data = split(/\t/);
@@ -222,8 +234,8 @@ sub collectAndPrintMetrics {
 		}
 
 		# Collect Contamination Metrics
-		open(F, "<analysis/$sampleName/contamination/$sampleName.contaminated.alnMetrics.txt")
-			|| die "Unable to open analysis/$sampleName/contamination/$sampleName.contaminated.alnMetrics.txt\n";
+		open(F, "<$outdir/$sampleName/contamination/$sampleName.contaminated.alnMetrics.txt")
+			|| die "Unable to open $outdir/$sampleName/contamination/$sampleName.contaminated.alnMetrics.txt\n";
 		@data = <F>;
 		close(F);
 		chomp @data;
@@ -239,7 +251,7 @@ sub collectAndPrintMetrics {
 		}
 
 		# Collect Picard Alignment Metrics
-		open(F, "<analysis/$sampleName/$sampleName.alnMetrics.txt") || die "Unable to open analysis/$sampleName/$sampleName.alnMetrics.txt";
+		open(F, "<$outdir/$sampleName/$sampleName.alnMetrics.txt") || die "Unable to open $outdir/$sampleName/$sampleName.alnMetrics.txt";
 		@data = <F>;
 		close(F);
 		chomp(@data);
@@ -257,7 +269,7 @@ sub collectAndPrintMetrics {
 		}
 
 		# Collect Picard Insert Size Metrics
-		open(F, "<analysis/$sampleName/$sampleName.insertSizeMetrics.txt") || die "Unable to open analysis/$sampleName/$sampleName.insertSizeMetrics.txt";
+		open(F, "<$outdir/$sampleName/$sampleName.insertSizeMetrics.txt") || die "Unable to open $outdir/$sampleName/$sampleName.insertSizeMetrics.txt";
 		@data = <F>;
 		close(F);
 		chomp(@data);
@@ -275,7 +287,7 @@ sub collectAndPrintMetrics {
 		}
 
 		# Collect Picard RNA-Seq Metrics
-		open(F, "<analysis/$sampleName/$sampleName.rnaseqMetrics.txt") || die "Unable to open analysis/$sampleName/$sampleName.rnaseqMetrics.txt";
+		open(F, "<$outdir/$sampleName/$sampleName.rnaseqMetrics.txt") || die "Unable to open $outdir/$sampleName/$sampleName.rnaseqMetrics.txt";
 		@data = <F>;
 		close(F);
 		chomp(@data);
@@ -293,7 +305,7 @@ sub collectAndPrintMetrics {
 		}
 
 		# Collect Hemoglobin Metrics
-		open(F, "<analysis/$sampleName/$sampleName.hemoglobinMetrics.txt") || die "Unable to open analysis/$sampleName/$sampleName.hemoglobinMetrics.txt";
+		open(F, "<$outdir/$sampleName/$sampleName.hemoglobinMetrics.txt") || die "Unable to open $outdir/$sampleName/$sampleName.hemoglobinMetrics.txt";
 		@data = <F>;
 		close(F);
 		chomp(@data);
@@ -310,7 +322,7 @@ sub collectAndPrintMetrics {
 		# The number of bases that had non-zero coverage.
 		# The length of the ERCC entry.
 		# The fraction of bases that had non-zero coverage.
-		open(F, "<analysis/$sampleName/$sampleName.idxStats.txt") || die "Unable to open analysis/$sampleName/$sampleName.idxStats.txt";
+		open(F, "<$outdir/$sampleName/$sampleName.idxStats.txt") || die "Unable to open $outdir/$sampleName/$sampleName.idxStats.txt";
 		@data = <F>;
 		close(F);
 		chomp(@data);
@@ -333,10 +345,10 @@ sub collectAndPrintMetrics {
 	# Generate RNA-Seq QC Plot
 	#my @METRICFILES;
 	#for my $sampleName (sort keys %SAMPLES) {
-	#	push @METRICSFILES, "analysis/$sampleName/$sampleName.rnaseqMetrics.txt";
+	#	push @METRICSFILES, "$outdir/$sampleName/$sampleName.rnaseqMetrics.txt";
 	#}
 	#$_ = join(" ", @METRICFILES);
-	#`Rscript $dirname/multiRnaSeqCoverage.R $_ analysis/rnaseq.txt analysis/rnaseq.png`;
+	#`Rscript $dirname/multiRnaSeqCoverage.R $_ $outdir/rnaseq.txt $outdir/rnaseq.png`;
 }
 
 main();
