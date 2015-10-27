@@ -49,6 +49,7 @@ sub main {
 	if ($dryRun != 1) {
 		waitForSamples();
 		makeExpressionMatrices($outdir);
+		makeSampleManifest($outdir);
 	}
 }
 
@@ -118,6 +119,7 @@ sub getJobStatus {
 
 sub waitForSamples() {
 	for my $sampleName (sort keys %SAMPLES) {
+		next if (!defined($SAMPLES{$sampleName}{'job'}));
 		my $job = $SAMPLES{$sampleName}{'job'};
 		print STDERR "Waiting for $sampleName ($job)...";
 
@@ -159,8 +161,19 @@ sub makeExpressionMatrices {
 
 	`$dirname/TCGAQuartileNormalizationUNC.pl -s 1 -c -1 -o $outdir/genes.UQ.matrix $outdir/genes.counts.matrix`;
 	`$dirname/TCGAQuartileNormalizationUNC.pl -s 1 -c -1 -o $outdir/isoforms.UQ.matrix $outdir/isoforms.counts.matrix`;
+}
 
-	# TBD: Make samples manifest for Xpress
+sub makeSampleManifest {
+	my $dirname = dirname(__FILE__);
+	my ($outdir) = @_;
+	
+	open(SMP, ">$outdir/samples.smp") || die "Unable to open $outdir/samples.smp for writing.\n";
+	print SMP join("\t", 'X-Object File v', '<- Factor Name'), "\n";
+	print SMP join("\t", 'Factor Type ->', 'X-Object Name v'), "\n";
+	for my $sampleName (sort keys %SAMPLES) {
+		print SMP join("\t", $sampleName, $sampleName), "\n";
+	}	
+	close(SMP);
 }
 
 main();

@@ -148,6 +148,11 @@ testRunWith2Samples()
     done
   done
 
+  # check for sample manifest
+  md1=`sort ${analysisDir}/samples.smp | md5sum | cut -f 1 -d ' '`
+  md2=`sort $testDataDir/twoSampleAnalysisOutput/samples.smp | md5sum | cut -f 1 -d ' '`
+  assertTrue "samples.smp do not match" "[ '$md1' == '$md2' ]"
+
   cd $oldWD
   unset oldWD
 }
