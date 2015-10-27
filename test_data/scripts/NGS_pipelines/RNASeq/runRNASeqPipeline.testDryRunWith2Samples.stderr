@@ -1,0 +1,8 @@
+dryRun: 1
+outdir: /scratch/analysis
+refmodel: hg19ERCC.refSeq
+tpmdir: /scratch
+samples: /home/golharr/workspace/rgtools/test_data/scripts/NGS_pipelines/RNASeq/QCPipeline/samples.txt
+
+Reading /home/golharr/workspace/rgtools/test_data/scripts/NGS_pipelines/RNASeq/QCPipeline/samples.txt...
+Found 2 samples.
