@@ -178,6 +178,7 @@ date '+%m/%d/%y %H:%M:%S'
 echo "Pipeline: $VERSION"
 echo "Reference Model: $REFMODEL"
 echo "Subsample: $SUBSAMPLE"
+analysis_date_started=$(date +"%s")
 
 # Make tmp working directory aka SAMPLE_DIR
 if [ -z "$SAMPLE_DIR" ]
@@ -358,7 +359,6 @@ then
 fi
 
 date '+%m/%d/%y %H:%M:%S'
-analysis_date_started=$(date +"%s")
 echo
 
 ##############################################################################
