@@ -1,0 +1,6 @@
+Usage:
+    runRNASeqQCPipeline.pl [--dryRun (default: False] [--outdir <output dir>
+    (default: analysis/{samples}) [--refmodel <refmodel> (default:
+    hg19ERCC.refSeq)] [--tmpdir <tmpdir> (default: /scratch)] --samples
+    <samples.txt>
+

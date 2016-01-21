@@ -1,0 +1,7 @@
+Usage: rnaseqqc_pipeline.sh [-s|--sample <sample name>] [-1|--fastq1 <path/to/fastq1>] [-2|--fastq2 <path/to/fastq2>]
+Options:
+  -h|--help
+  -o|--outdir <output directory> [default=current working directory]
+  --refmodel <reference model> (hg19ERCC/mm10ERCC/rn6ERCC) (default=hg19ERCC)
+  --sample-dir (analysis directory to use. Use same tmp dir, for debugging
+  --subsample [# of reads]

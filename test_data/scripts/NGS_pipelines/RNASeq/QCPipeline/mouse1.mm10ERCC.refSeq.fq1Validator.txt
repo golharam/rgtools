@@ -1,0 +1,3 @@
+Finished processing /home/golharr/workspace/rgtools/test_data/scripts/NGS_pipelines/RNASeq/QCPipeline/mouse1_1.fastq.gz with 2000000 lines containing 500000 sequences.
+There were a total of 0 errors.
+Returning: 0 : FASTQ_SUCCESS

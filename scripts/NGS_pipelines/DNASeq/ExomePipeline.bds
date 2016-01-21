@@ -1,28 +1,32 @@
 #!/usr/bin/env bds
 
-string external_packages = "/apps/sys/galaxy/external_packages"
+#string external_packages = "/apps/sys/galaxy/external_packages"
+#string reference_genomes = "/ng18/galaxy/reference_genomes"
+
+string external_packages = "/ngs/apps"
+string reference_genomes = "/ngs/reference"
+
 string fastqValidatorApp = "$external_packages/bin/fastQValidator"
 string fastqcApp = "$external_packages/bin/fastqc"
 string bwaApp = "$external_packages/bin/bwa"
-string javaApp = "$external_packages/bin/java"
+string javaApp = "$external_packages/jre1.7.0_67/bin/java"
 string picardJar = "$external_packages/picard-tools-1.129/picard.jar"
 string samtoolsApp = "$external_packages/bin/samtools"
 
-string reference_genomes = "/ng18/galaxy/reference_genomes"
 string genome = "hg19"
 string bwaReference = "$reference_genomes/$genome/bwa_index/$genome"
 string reference = "$reference_genomes/$genome/$genome.fa"
 
-string gatkJar = "/ngs/ngs15/golharr/apps/GenomeAnalysisTK-2014.3-17-g0583018/GenomeAnalysisTK.jar"
-string gatkKnownSnps = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/1000G_phase1.snps.high_confidence.hg19.vcf"
-string gatkHapMap = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/hapmap_3.3.hg19.vcf"
-string gatkOmni = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/1000G_omni2.5.hg19.vcf"
-string gatkDbSnp = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/dbsnp_137.hg19.vcf"
-string gatkMills = "/ngs/ngs15/golharr/NGS/reference/hg19/reference/Mills_and_1000G_gold_standard.indels.hg19.vcf"
-string cgaJar = "/ngs/ngs15/golharr/apps/CancerAnalysisPackage-2014.4-8-gf14306c/SomaticAnalysisTK.jar"
-string cosmicVcf = "/ngs/ngs15/golharr/apps/CancerAnalysisPackage-2014.4-8-gf14306c/data/reference/hg19_CosmicCodingMuts_v70.vcf"
-string snpEffDir = "/apps/sys/galaxy/external_packages/snpEff_4.1E"
-string snpEffJar = "/apps/sys/galaxy/external_packages/snpEff_4.1E/snpEff.jar"
+string gatkJar = "$external_packages/GenomeAnalysisTK-2015.1-3-g53415c9/GenomeAnalysisTK.jar"
+string gatkKnownSnps = "$reference_genomes/$genome/annotation/gatk/1000G_phase1.snps.high_confidence.hg19.vcf"
+string gatkHapMap = "$reference_genomes/$genome/annotation/gatk/hapmap_3.3.hg19.vcf"
+string gatkOmni = "$reference_genomes/$genome/annotation/gatk/1000G_omni2.5.hg19.vcf"
+string gatkDbSnp = "$reference_genomes/$genome/annotation/gatk/dbsnp_137.hg19.vcf"
+string gatkMills = "$reference_genomes/$genome/annotation/gatk/Mills_and_1000G_gold_standard.indels.hg19.vcf"
+string cgaJar = "$external_packages/CancerAnalysisPackage-2014.4-8-gf14306c/SomaticAnalysisTK.jar"
+string cosmicVcf = "$reference_genomes/$genome/annotation/gatk/hg19_CosmicCodingMuts_v70.vcf"
+string snpEffDir = "$external_packages/snpEff_4.1E"
+string snpEffJar = "$external_packages/snpEff_4.1E/snpEff.jar"
 
 print "Exome Pipeline v1.1\n"
 
@@ -283,7 +287,6 @@ for (string sample : samples) {
 		sys $javaApp -Xmx4G -jar $picardJar CalculateHsMetrics BI=$targetRegionsListFile TI=$targetRegionsListFile REFERENCE_SEQUENCE=$reference I=$dedupBamFile O=$hsMetricsFile PER_TARGET_COVERAGE=$perTargetMetricsFile
 	}
 	hsMetricsFiles.add(hsMetricsFile)
-
 	sampleDedupBamFiles{sample} = dedupBamFile
 	sampleRealignedBamFiles{sample} = "$analysisDir/intermediate/$sample.dedup.realigned.bam"
 	sampleRecalibratedBamFiles{sample} = "$analysisDir/BAM/$sample.dedup.realigned.recal.bam"
@@ -327,11 +330,11 @@ task ( outFile <- hsMetricsFiles, taskName := "collectHsMetrics" ) {
 
 # TODO
 # 7. Summary Per Target Metrics
-#task ( "analysis/coverage/pertargetmetrics.txt" <- targetRegionCoverageFiles.values()) {
-#	sys /home/golharr/workspace/rgtools/scripts/perl/summarizePerTargetMetrics.pl samples.txt > analysis/coverage/pertargetmetrics.txt
-#}
+task ( "analysis/coverage/pertargetmetrics.txt" <- targetRegionCoverageFiles.values()) {
+	sys /home/golharr/workspace/rgtools/scripts/perl/summarizePerTargetMetrics.pl samples.txt > analysis/coverage/pertargetmetrics.txt
+}
 
-# ~/workspace/rgtools/scripts/R/plotCoverage.R
+~/workspace/rgtools/scripts/R/plotCoverage.R
 
 # 8.  Create indel targets
 string indelRealignerTargetsFile = "$analysisDir/intermediate/indelrealigner.list"
@@ -381,7 +384,7 @@ task ( "$analysisDir/intermediate/post_recal.table" <- "$analysisDir/intermediat
 	sys $javaApp -jar $gatkJar \
 		-T BaseRecalibrator \
 		-I $analysisDir/intermediate/bamfiles.realigned.list \
-		 -knownSites $gatkKnownSnps \
+		-knownSites $gatkKnownSnps \
 		-R $reference \
 		-nct 64 \
 		-BQSR $analysisDir/intermediate/recal.table \

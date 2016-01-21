@@ -1,0 +1,12 @@
+PASS	Basic Statistics	test2_1.subsampled.fastq
+PASS	Per base sequence quality	test2_1.subsampled.fastq
+PASS	Per tile sequence quality	test2_1.subsampled.fastq
+PASS	Per sequence quality scores	test2_1.subsampled.fastq
+FAIL	Per base sequence content	test2_1.subsampled.fastq
+PASS	Per sequence GC content	test2_1.subsampled.fastq
+PASS	Per base N content	test2_1.subsampled.fastq
+WARN	Sequence Length Distribution	test2_1.subsampled.fastq
+PASS	Sequence Duplication Levels	test2_1.subsampled.fastq
+PASS	Overrepresented sequences	test2_1.subsampled.fastq
+PASS	Adapter Content	test2_1.subsampled.fastq
+WARN	Kmer Content	test2_1.subsampled.fastq
